@@ -1,0 +1,27 @@
+[
+  {
+    "username": "MyUser",
+    "password": "123456",
+    "avatar": null
+  },
+  {
+    "username": "Admin",
+    "password": "admin123",
+    "avatar": null
+  },
+  {
+    "username": "TroLy",
+    "password": "123456",
+    "avatar": null
+  },
+  {
+    "username": "m4dev",
+    "password": "m4dev123",
+    "avatar": "/uploads/avatars/m4dev-1786779342262.png"
+  },
+  {
+    "username": "concac",
+    "password": "nhut6789",
+    "avatar": "/uploads/avatars/concac-1786781246119.png"
+  }
+]

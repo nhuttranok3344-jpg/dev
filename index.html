@@ -1,0 +1,913 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>M4 Chat</title>
+
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- =========================================
+         LEFT SERVER BAR
+    ========================================== -->
+
+    <aside class="server-bar">
+
+        <div class="server-logo">
+            M4
+        </div>
+
+        <div class="server-divider"></div>
+
+        <button class="server-icon active" title="M4 Chat">
+            💬
+        </button>
+
+        <button class="server-icon" title="Bạn bè">
+            👥
+        </button>
+
+        <button class="server-icon" title="Thông báo">
+            🔔
+        </button>
+
+        <div class="server-bottom">
+            <button class="server-icon" title="Cài đặt">
+                ⚙️
+            </button>
+        </div>
+
+    </aside>
+
+
+    <!-- =========================================
+         DM SIDEBAR
+    ========================================== -->
+
+    <aside class="dm-sidebar">
+
+        <div class="dm-header">
+            <strong>M4 Chat</strong>
+
+            <button
+                id="openAddFriend"
+                class="header-add"
+                type="button"
+                title="Thêm bạn"
+            >
+                +
+            </button>
+        </div>
+
+
+        <div class="friend-search-wrap">
+
+            <input
+                id="friendSearch"
+                type="text"
+                placeholder="Tìm bạn bè..."
+                autocomplete="off"
+            >
+
+        </div>
+
+
+        <div class="dm-section-title">
+
+            <span>TIN NHẮN RIÊNG</span>
+
+        </div>
+
+
+        <!-- REQUESTS -->
+
+        <div
+            id="friendRequests"
+            class="friend-requests"
+        ></div>
+
+
+        <!-- DEFAULT USERS -->
+
+        <div
+            id="defaultFriends"
+            class="dm-list"
+        >
+
+            <button
+                type="button"
+                class="dm-user"
+                data-user="Admin"
+            >
+
+                <span class="dm-avatar">
+
+                    <span class="avatar-letter">
+                        A
+                    </span>
+
+                    <i
+                        id="presence-Admin"
+                        class="presence"
+                    ></i>
+
+                </span>
+
+                <span class="dm-user-info">
+
+                    <strong>Admin</strong>
+
+                    <small>
+                        Hỗ trợ M4 Chat
+                    </small>
+
+                </span>
+
+            </button>
+
+
+            <button
+                type="button"
+                class="dm-user"
+                data-user="TroLy"
+            >
+
+                <span class="dm-avatar">
+
+                    <span class="avatar-letter">
+                        T
+                    </span>
+
+                    <i
+                        id="presence-TroLy"
+                        class="presence"
+                    ></i>
+
+                </span>
+
+                <span class="dm-user-info">
+
+                    <strong>TroLy</strong>
+
+                    <small>
+                        Trợ lý
+                    </small>
+
+                </span>
+
+            </button>
+
+        </div>
+
+
+        <!-- FRIEND LIST -->
+
+        <div
+            id="friendsList"
+            class="dm-list"
+        ></div>
+
+
+        <!-- USER PANEL -->
+
+        <div class="user-panel">
+
+            <button
+                id="userAvatar"
+                class="user-panel-avatar"
+                type="button"
+            >
+                M
+            </button>
+
+
+            <div class="user-panel-info">
+
+                <strong id="usernameText">
+                    Đang tải...
+                </strong>
+
+                <span>
+                    Online
+                </span>
+
+            </div>
+
+
+            <button
+                id="soundButton"
+                class="user-panel-button"
+                type="button"
+                title="Âm thanh"
+            >
+                🔊
+            </button>
+
+
+            <button
+                id="settingsButton"
+                class="user-panel-button"
+                type="button"
+                title="Cài đặt"
+            >
+                ⚙
+            </button>
+
+        </div>
+
+    </aside>
+
+
+    <!-- =========================================
+         MAIN CHAT
+    ========================================== -->
+
+    <main class="chat">
+
+        <!-- CHAT HEADER -->
+
+        <header class="chat-header">
+
+            <div class="chat-user">
+
+                <div
+                    id="chatUserAvatar"
+                    class="chat-avatar"
+                >
+                    ?
+                </div>
+
+
+                <div class="chat-user-info">
+
+                    <strong id="channelName">
+                        Chọn một người
+                    </strong>
+
+                    <span id="channelTopic">
+                        Chọn bạn bè để bắt đầu trò chuyện
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div class="chat-actions">
+
+                <button
+                    type="button"
+                    title="Tìm kiếm"
+                >
+                    🔍
+                </button>
+
+                <button
+                    type="button"
+                    title="Ghim"
+                >
+                    📌
+                </button>
+
+                <button
+                    type="button"
+                    title="Thành viên"
+                >
+                    👥
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <!-- MESSAGES -->
+
+        <section
+            id="messages"
+            class="messages"
+        >
+
+            <div
+                id="welcome"
+                class="welcome"
+            >
+
+                <div class="welcome-icon">
+                    💬
+                </div>
+
+                <h2>
+                    Chào mừng đến M4 Chat
+                </h2>
+
+                <p>
+                    Chọn một người ở bên trái để bắt đầu trò chuyện.
+                </p>
+
+            </div>
+
+        </section>
+
+
+        <!-- TYPING -->
+
+        <div
+            id="typing"
+            class="typing"
+        ></div>
+
+
+        <!-- =====================================
+             REPLY BAR
+        ====================================== -->
+
+        <div
+            id="replyBar"
+            class="reply-bar hidden"
+        >
+
+            <div class="reply-content">
+
+                <span>
+                    Đang trả lời
+                </span>
+
+                <strong id="replyUsername">
+                    User
+                </strong>
+
+                <p id="replyPreview">
+                    Tin nhắn...
+                </p>
+
+            </div>
+
+
+            <button
+                id="cancelReply"
+                type="button"
+                title="Hủy trả lời"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <!-- =====================================
+             COMPOSER
+        ====================================== -->
+
+        <footer class="composer">
+
+            <button
+                id="imageButton"
+                class="composer-button"
+                type="button"
+                title="Gửi ảnh"
+            >
+                ＋
+            </button>
+
+
+            <input
+                id="imageInput"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,gif"
+                hidden
+            >
+
+
+            <input
+                id="messageInput"
+                type="text"
+                placeholder="Chọn một người để nhắn tin..."
+                autocomplete="off"
+                maxlength="2000"
+                disabled
+            >
+
+
+            <button
+                id="emojiButton"
+                class="composer-button"
+                type="button"
+                title="Emoji"
+            >
+                😊
+            </button>
+
+
+            <button
+                id="sendButton"
+                class="send-button"
+                type="button"
+                disabled
+            >
+                ➤
+            </button>
+
+        </footer>
+
+    </main>
+
+
+    <!-- =========================================
+         RIGHT PROFILE PANEL
+    ========================================== -->
+
+    <aside class="profile-panel">
+
+        <div class="profile-cover"></div>
+
+        <div class="profile-avatar-wrap">
+
+            <div
+                id="privateAvatar"
+                class="profile-avatar"
+            >
+                ?
+            </div>
+
+            <span
+                class="profile-online"
+            ></span>
+
+        </div>
+
+
+        <div class="profile-name">
+
+            <strong id="privateUsername">
+                Chưa chọn
+            </strong>
+
+            <span id="privateStatus">
+                Offline
+            </span>
+
+        </div>
+
+
+        <div class="profile-divider"></div>
+
+
+        <div class="profile-section">
+
+            <span class="profile-label">
+                GIỚI THIỆU
+            </span>
+
+            <p>
+                Thành viên M4 Chat
+            </p>
+
+        </div>
+
+
+        <div class="profile-section">
+
+            <span class="profile-label">
+                TRẠNG THÁI
+            </span>
+
+            <p class="profile-status-row">
+
+                <i class="status-dot"></i>
+
+                Đang hoạt động
+
+            </p>
+
+        </div>
+
+    </aside>
+
+</div>
+
+
+<!-- =========================================
+     ADD FRIEND MODAL
+========================================== -->
+
+<div
+    id="addFriendModal"
+    class="modal hidden"
+>
+
+    <div class="modal-box">
+
+        <div class="modal-header">
+
+            <div>
+
+                <h2>
+                    Thêm bạn
+                </h2>
+
+                <p>
+                    Nhập username để gửi lời mời.
+                </p>
+
+            </div>
+
+            <button
+                id="closeAddFriend"
+                type="button"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <label>
+            USERNAME
+        </label>
+
+        <input
+            id="friendUsername"
+            type="text"
+            placeholder="Nhập username..."
+            maxlength="20"
+            autocomplete="off"
+        >
+
+
+        <div
+            id="friendMessage"
+            class="form-message"
+        ></div>
+
+
+        <button
+            id="sendFriendRequest"
+            class="primary-button"
+            type="button"
+        >
+            Gửi lời mời
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =========================================
+     SETTINGS MODAL
+========================================== -->
+
+<div
+    id="settingsModal"
+    class="modal hidden"
+>
+
+    <div class="settings-box">
+
+        <button
+            id="closeSettings"
+            class="settings-close"
+            type="button"
+        >
+            ×
+        </button>
+
+
+        <aside class="settings-sidebar">
+
+            <h3>
+                Cài đặt
+            </h3>
+
+            <button
+                class="settings-tab active"
+                data-page="account"
+                type="button"
+            >
+                👤 Tài khoản
+            </button>
+
+            <button
+                class="settings-tab"
+                data-page="appearance"
+                type="button"
+            >
+                🎨 Giao diện
+            </button>
+
+            <button
+                class="settings-tab"
+                data-page="avatar"
+                type="button"
+            >
+                🖼️ Avatar
+            </button>
+
+            <button
+                class="settings-tab"
+                data-page="sound"
+                type="button"
+            >
+                🔊 Âm thanh
+            </button>
+
+            <button
+                id="logoutButton"
+                class="logout-button"
+                type="button"
+            >
+                🚪 Đăng xuất
+            </button>
+
+        </aside>
+
+
+        <section class="settings-content">
+
+
+            <!-- ACCOUNT -->
+
+            <div
+                id="page-account"
+                class="settings-page"
+            >
+
+                <h2>
+                    Tài khoản
+                </h2>
+
+                <p class="settings-description">
+                    Quản lý thông tin tài khoản của bạn.
+                </p>
+
+
+                <div class="account-card">
+
+                    <div
+                        id="accountAvatar"
+                        class="account-avatar"
+                    >
+                        M
+                    </div>
+
+                    <div>
+
+                        <strong id="accountUsername">
+                            Đang tải...
+                        </strong>
+
+                        <span>
+                            Tài khoản M4 Chat
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <!-- CHANGE USERNAME -->
+
+                <div class="setting-item">
+
+                    <div>
+
+                        <strong>
+                            Username
+                        </strong>
+
+                        <small>
+                            Tên hiển thị của bạn.
+                        </small>
+
+                    </div>
+
+                    <div class="username-change">
+
+                        <input
+                            id="newUsername"
+                            type="text"
+                            maxlength="20"
+                            placeholder="Username mới"
+                        >
+
+                        <button
+                            id="changeUsernameButton"
+                            type="button"
+                        >
+                            Lưu
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="usernameMessage"
+                    class="form-message"
+                ></div>
+
+            </div>
+
+
+            <!-- APPEARANCE -->
+
+            <div
+                id="page-appearance"
+                class="settings-page hidden"
+            >
+
+                <h2>
+                    Giao diện
+                </h2>
+
+                <p class="settings-description">
+                    Tùy chỉnh giao diện M4 Chat.
+                </p>
+
+
+                <div class="setting-item">
+
+                    <div>
+
+                        <strong>
+                            Chế độ tối
+                        </strong>
+
+                        <small>
+                            Giao diện Discord dark mode.
+                        </small>
+
+                    </div>
+
+                    <label class="switch">
+
+                        <input
+                            id="darkToggle"
+                            type="checkbox"
+                            checked
+                        >
+
+                        <span></span>
+
+                    </label>
+
+                </div>
+
+            </div>
+
+
+            <!-- AVATAR -->
+
+            <div
+                id="page-avatar"
+                class="settings-page hidden"
+            >
+
+                <h2>
+                    Avatar
+                </h2>
+
+                <p class="settings-description">
+                    Chọn hoặc tải avatar mới.
+                </p>
+
+
+                <div class="avatar-preview">
+
+                    <div
+                        id="settingsAvatar"
+                        class="settings-avatar"
+                    >
+                        M
+                    </div>
+
+                </div>
+
+
+                <label
+                    for="avatarUpload"
+                    class="upload-button"
+                >
+                    📷 Tải ảnh lên
+                </label>
+
+                <input
+                    id="avatarUpload"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    hidden
+                >
+
+
+                <div class="avatar-collection">
+
+                    <button
+                        class="collection-avatar"
+                        data-avatar="M"
+                        type="button"
+                    >
+                        M
+                    </button>
+
+                    <button
+                        class="collection-avatar"
+                        data-avatar="A"
+                        type="button"
+                    >
+                        A
+                    </button>
+
+                    <button
+                        class="collection-avatar"
+                        data-avatar="🔥"
+                        type="button"
+                    >
+                        🔥
+                    </button>
+
+                    <button
+                        class="collection-avatar"
+                        data-avatar="😎"
+                        type="button"
+                    >
+                        😎
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- SOUND -->
+
+            <div
+                id="page-sound"
+                class="settings-page hidden"
+            >
+
+                <h2>
+                    Âm thanh
+                </h2>
+
+                <p class="settings-description">
+                    Điều chỉnh âm thanh thông báo.
+                </p>
+
+
+                <div class="setting-item">
+
+                    <div>
+
+                        <strong>
+                            Âm thanh tin nhắn
+                        </strong>
+
+                        <small>
+                            Phát âm thanh khi có tin nhắn mới.
+                        </small>
+
+                    </div>
+
+                    <label class="switch">
+
+                        <input
+                            id="soundToggle"
+                            type="checkbox"
+                            checked
+                        >
+
+                        <span></span>
+
+                    </label>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </div>
+
+</div>
+
+
+<!-- SOCKET.IO -->
+
+<script src="/socket.io/socket.io.js"></script>
+
+<!-- APP -->
+
+<script src="/app.js"></script>
+
+</body>
+</html>
+

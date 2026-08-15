@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="theme-color"
+        content="#080a0f"
+    >
+
+    <title>Đăng nhập • M4 Chat</title>
+
+    <link
+        rel="stylesheet"
+        href="/login.css"
+    >
+</head>
+
+<body>
+
+    <div class="login-page">
+
+        <!-- Background -->
+
+        <div class="bg-glow bg-glow-one"></div>
+        <div class="bg-glow bg-glow-two"></div>
+
+
+        <!-- Login Card -->
+
+        <main class="login-card">
+
+            <div class="brand">
+
+                <div class="brand-logo">
+                    M4
+                </div>
+
+                <div class="brand-text">
+
+                    <strong>
+                        M4 CHAT
+                    </strong>
+
+                    <span>
+                        PRIVATE MESSENGER
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div class="login-heading">
+
+                <h1>
+                    Chào mừng trở lại
+                </h1>
+
+                <p>
+                    Đăng nhập để tiếp tục trò chuyện.
+                </p>
+
+            </div>
+
+
+            <form
+                id="loginForm"
+                autocomplete="on"
+            >
+
+                <!-- Username -->
+
+                <div class="form-group">
+
+                    <label
+                        for="username"
+                    >
+                        Username
+                    </label>
+
+                    <div class="input-box">
+
+                        <span class="input-icon">
+                            @
+                        </span>
+
+                        <input
+                            id="username"
+                            name="username"
+                            type="text"
+                            placeholder="Nhập username"
+                            maxlength="20"
+                            autocomplete="username"
+                            required
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <!-- Password -->
+
+                <div class="form-group">
+
+                    <div class="label-row">
+
+                        <label
+                            for="password"
+                        >
+                            Mật khẩu
+                        </label>
+
+                    </div>
+
+                    <div class="input-box">
+
+                        <span class="input-icon">
+                            •
+                        </span>
+
+                        <input
+                            id="password"
+                            name="password"
+                            type="password"
+                            placeholder="Nhập mật khẩu"
+                            autocomplete="current-password"
+                            required
+                        >
+
+                        <button
+                            id="togglePassword"
+                            class="password-toggle"
+                            type="button"
+                            aria-label="Hiện mật khẩu"
+                        >
+                            Hiện
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Error -->
+
+                <div
+                    id="loginMessage"
+                    class="form-message"
+                    role="alert"
+                ></div>
+
+
+                <!-- Submit -->
+
+                <button
+                    id="loginButton"
+                    class="login-button"
+                    type="submit"
+                >
+
+                    <span
+                        id="loginButtonText"
+                    >
+                        Đăng nhập
+                    </span>
+
+                    <span
+                        id="loginLoading"
+                        class="loading hidden"
+                    >
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                    </span>
+
+                </button>
+
+            </form>
+
+
+            <!-- Divider -->
+
+            <div class="divider">
+
+                <span></span>
+
+                <small>
+                    M4 CHAT
+                </small>
+
+                <span></span>
+
+            </div>
+
+
+            <!-- Register -->
+
+            <div class="register-box">
+
+                <span>
+                    Chưa có tài khoản?
+                </span>
+
+                <a href="/register.html">
+                    Tạo tài khoản
+                </a>
+
+            </div>
+
+
+            <div class="security-note">
+
+                <span>
+                    🔒
+                </span>
+
+                <span>
+                    Kết nối được bảo vệ bởi M4 Chat
+                </span>
+
+            </div>
+
+        </main>
+
+
+        <footer class="page-footer">
+
+            <span>
+                M4 CHAT
+            </span>
+
+            <span>
+                •
+            </span>
+
+            <span>
+                Private Messenger
+            </span>
+
+        </footer>
+
+    </div>
+
+
+    <script src="/login.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,348 @@
+"use strict";
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    const loginForm =
+        document.getElementById("loginForm");
+
+    const usernameInput =
+        document.getElementById("username");
+
+    const passwordInput =
+        document.getElementById("password");
+
+    const loginButton =
+        document.getElementById("loginButton");
+
+    const loginButtonText =
+        document.getElementById("loginButtonText");
+
+    const loginLoading =
+        document.getElementById("loginLoading");
+
+    const loginMessage =
+        document.getElementById("loginMessage");
+
+    const togglePassword =
+        document.getElementById("togglePassword");
+
+
+    /* =====================================================
+       MESSAGE
+    ===================================================== */
+
+    function showMessage(message) {
+
+        if (!loginMessage) {
+            return;
+        }
+
+        loginMessage.textContent =
+            message || "";
+    }
+
+
+    /* =====================================================
+       LOADING
+    ===================================================== */
+
+    function setLoading(loading) {
+
+        if (loginButton) {
+            loginButton.disabled =
+                loading;
+        }
+
+        if (loginButtonText) {
+            loginButtonText.classList.toggle(
+                "hidden",
+                loading
+            );
+        }
+
+        if (loginLoading) {
+            loginLoading.classList.toggle(
+                "hidden",
+                !loading
+            );
+        }
+
+        if (usernameInput) {
+            usernameInput.disabled =
+                loading;
+        }
+
+        if (passwordInput) {
+            passwordInput.disabled =
+                loading;
+        }
+
+    }
+
+
+    /* =====================================================
+       TOGGLE PASSWORD
+    ===================================================== */
+
+    if (togglePassword && passwordInput) {
+
+        togglePassword.addEventListener(
+            "click",
+            () => {
+
+                const hidden =
+                    passwordInput.type === "password";
+
+                passwordInput.type =
+                    hidden
+                        ? "text"
+                        : "password";
+
+                togglePassword.textContent =
+                    hidden
+                        ? "Ẩn"
+                        : "Hiện";
+
+                togglePassword.setAttribute(
+                    "aria-label",
+                    hidden
+                        ? "Ẩn mật khẩu"
+                        : "Hiện mật khẩu"
+                );
+
+            }
+        );
+
+    }
+
+
+    /* =====================================================
+       LOGIN
+    ===================================================== */
+
+    if (loginForm) {
+
+        loginForm.addEventListener(
+            "submit",
+            async (event) => {
+
+                event.preventDefault();
+
+                showMessage("");
+
+                const username =
+                    usernameInput
+                        ?.value
+                        .trim() || "";
+
+                const password =
+                    passwordInput
+                        ?.value || "";
+
+
+                /* -----------------------------------------
+                   VALIDATION
+                ----------------------------------------- */
+
+                if (!username) {
+
+                    showMessage(
+                        "Vui lòng nhập username."
+                    );
+
+                    usernameInput?.focus();
+
+                    return;
+                }
+
+
+                if (!password) {
+
+                    showMessage(
+                        "Vui lòng nhập mật khẩu."
+                    );
+
+                    passwordInput?.focus();
+
+                    return;
+                }
+
+
+                setLoading(true);
+
+
+                try {
+
+                    const response =
+                        await fetch(
+                            "/api/login",
+                            {
+                                method: "POST",
+
+                                credentials:
+                                    "include",
+
+                                headers: {
+                                    "Content-Type":
+                                        "application/json"
+                                },
+
+                                body:
+                                    JSON.stringify({
+                                        username,
+                                        password
+                                    })
+                            }
+                        );
+
+
+                    let data = {};
+
+                    try {
+
+                        data =
+                            await response.json();
+
+                    } catch {
+
+                        data = {};
+
+                    }
+
+
+                    if (!response.ok) {
+
+                        throw new Error(
+                            data.message ||
+                            "Đăng nhập thất bại."
+                        );
+
+                    }
+
+
+                    if (!data.success) {
+
+                        throw new Error(
+                            data.message ||
+                            "Đăng nhập thất bại."
+                        );
+
+                    }
+
+
+                    /*
+                     * Server đã tạo cookie JWT.
+                     * Không lưu password/token vào localStorage.
+                     */
+
+                    showMessage("");
+
+                    if (loginButtonText) {
+
+                        loginButtonText.textContent =
+                            "Đang vào M4 Chat...";
+
+                        loginButtonText.classList.remove(
+                            "hidden"
+                        );
+
+                    }
+
+                    if (loginLoading) {
+
+                        loginLoading.classList.add(
+                            "hidden"
+                        );
+
+                    }
+
+
+                    /*
+                     * Chuyển vào trang chat.
+                     */
+
+                    window.location.replace("/");
+
+
+                } catch (error) {
+
+                    console.error(
+                        "Login error:",
+                        error
+                    );
+
+                    showMessage(
+                        error.message ||
+                        "Không thể kết nối máy chủ."
+                    );
+
+                    setLoading(false);
+
+                }
+
+            }
+        );
+
+    }
+
+
+    /* =====================================================
+       CLEAR ERROR WHEN USER TYPES
+    ===================================================== */
+
+    [
+        usernameInput,
+        passwordInput
+    ]
+        .forEach(
+            input => {
+
+                input?.addEventListener(
+                    "input",
+                    () => {
+
+                        if (loginMessage) {
+                            loginMessage.textContent =
+                                "";
+                        }
+
+                    }
+                );
+
+            }
+        );
+
+
+    /* =====================================================
+       ENTER
+    ===================================================== */
+
+    passwordInput?.addEventListener(
+        "keydown",
+        event => {
+
+            if (event.key === "Enter") {
+
+                /*
+                 * Form submit sẽ tự xử lý.
+                 * Không cần gọi login lần thứ hai.
+                 */
+
+            }
+
+        }
+    );
+
+
+    /* =====================================================
+       INITIAL FOCUS
+    ===================================================== */
+
+    usernameInput?.focus();
+
+
+    console.log(
+        "M4 Chat login.js loaded."
+    );
+
+});
