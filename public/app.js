@@ -3,7 +3,8 @@
 
 /* =========================================================
    M4 CHAT - APP.JS
-   FULL VERSION
+   FULL RESPONSIVE VERSION
+   - PC + Mobile
    - Auth
    - Socket.IO
    - Friends
@@ -18,6 +19,9 @@
    - Settings
    - Dark mode
    - Sound
+   - Mobile sidebar
+   - Mobile chat back
+   - Mobile keyboard / viewport
 ========================================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -77,7 +81,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const accountAvatar = $("accountAvatar");
 
     const newUsername = $("newUsername");
-    const changeUsernameButton = $("changeUsernameButton");
+    const changeUsernameButton =
+        $("changeUsernameButton");
     const usernameMessage = $("usernameMessage");
 
     const settingsAvatar = $("settingsAvatar");
@@ -106,49 +111,427 @@ document.addEventListener("DOMContentLoaded", () => {
     let soundEnabled = true;
     let initialized = false;
 
+    let mobileChatOpen = false;
+
+    /* =====================================================
+       RESPONSIVE HELPERS
+    ===================================================== */
+
+    function isMobile() {
+        return window.matchMedia(
+            "(max-width: 768px)"
+        ).matches;
+    }
+
+    function rootElement() {
+        return document.documentElement;
+    }
+
+    function bodyElement() {
+        return document.body;
+    }
+
+    function addClass(element, className) {
+        element?.classList.add(className);
+    }
+
+    function removeClass(element, className) {
+        element?.classList.remove(className);
+    }
+
+    function toggleClass(
+        element,
+        className,
+        state
+    ) {
+        element?.classList.toggle(
+            className,
+            state
+        );
+    }
+
+    /*
+       Tìm các phần tử menu/sidebar phổ biến.
+       Nếu HTML của bạn dùng một trong các class này
+       thì JS sẽ tự hoạt động.
+    */
+
+    const mobileMenuButton =
+        document.querySelector(
+            "#mobileMenuButton, " +
+            "#menuButton, " +
+            ".mobile-menu-button, " +
+            ".menu-button, " +
+            "[data-mobile-menu]"
+        );
+
+    const sidebar =
+        document.querySelector(
+            "#sidebar, " +
+            ".sidebar, " +
+            ".chat-sidebar, " +
+            ".left-sidebar"
+        );
+
+    const mobileBackButton =
+        document.querySelector(
+            "#mobileBackButton, " +
+            "#backButton, " +
+            ".mobile-back-button, " +
+            ".chat-back-button, " +
+            "[data-mobile-back]"
+        );
+
+    const chatMain =
+        document.querySelector(
+            "#chatMain, " +
+            ".chat-main, " +
+            ".main-chat, " +
+            ".chat-container"
+        );
+
+    function setMobileMenu(open) {
+
+        if (!isMobile()) {
+            open = false;
+        }
+
+        toggleClass(
+            sidebar,
+            "mobile-open",
+            open
+        );
+
+        toggleClass(
+            bodyElement(),
+            "sidebar-open",
+            open
+        );
+    }
+
+    function openMobileChat() {
+
+        if (!isMobile()) {
+            return;
+        }
+
+        mobileChatOpen = true;
+
+        addClass(
+            bodyElement(),
+            "mobile-chat-open"
+        );
+
+        removeClass(
+            sidebar,
+            "mobile-open"
+        );
+
+        removeClass(
+            bodyElement(),
+            "sidebar-open"
+        );
+
+        addClass(
+            chatMain,
+            "mobile-active"
+        );
+    }
+
+    function closeMobileChat() {
+
+        if (!isMobile()) {
+            return;
+        }
+
+        mobileChatOpen = false;
+
+        removeClass(
+            bodyElement(),
+            "mobile-chat-open"
+        );
+
+        removeClass(
+            chatMain,
+            "mobile-active"
+        );
+
+        setMobileMenu(false);
+
+        currentChatUser = null;
+
+        if (channelName) {
+            channelName.textContent =
+                "M4 CHAT";
+        }
+
+        if (channelTopic) {
+            channelTopic.textContent =
+                "Chọn một người để bắt đầu chat";
+        }
+
+        if (privateUsername) {
+            privateUsername.textContent =
+                "";
+        }
+
+        if (typingBox) {
+            typingBox.textContent =
+                "";
+        }
+
+        clearMessages();
+
+        if (welcome) {
+            welcome.style.display = "";
+        }
+
+        document
+            .querySelectorAll(".dm-user")
+            .forEach(element => {
+                element.classList.remove(
+                    "active"
+                );
+            });
+    }
+
+    mobileMenuButton?.addEventListener(
+        "click",
+        event => {
+
+            event.preventDefault();
+
+            if (!isMobile()) {
+                return;
+            }
+
+            const open =
+                !sidebar?.classList.contains(
+                    "mobile-open"
+                );
+
+            setMobileMenu(open);
+        }
+    );
+
+    mobileBackButton?.addEventListener(
+        "click",
+        event => {
+
+            event.preventDefault();
+
+            closeMobileChat();
+        }
+    );
+
+    /*
+       Click ra ngoài sidebar trên mobile
+       thì đóng sidebar.
+    */
+
+    document.addEventListener(
+        "click",
+        event => {
+
+            if (!isMobile()) {
+                return;
+            }
+
+            if (
+                !sidebar ||
+                !sidebar.classList.contains(
+                    "mobile-open"
+                )
+            ) {
+                return;
+            }
+
+            const target =
+                event.target;
+
+            if (
+                sidebar.contains(target) ||
+                mobileMenuButton?.contains(target)
+            ) {
+                return;
+            }
+
+            setMobileMenu(false);
+        }
+    );
+
+    /*
+       Xử lý viewport khi bàn phím điện thoại xuất hiện.
+    */
+
+    function updateMobileViewport() {
+
+        if (!window.visualViewport) {
+            return;
+        }
+
+        const viewport =
+            window.visualViewport;
+
+        rootElement().style.setProperty(
+            "--m4-viewport-height",
+            `${viewport.height}px`
+        );
+
+        if (
+            isMobile() &&
+            messageInput
+        ) {
+
+            requestAnimationFrame(() => {
+
+                if (
+                    document.activeElement ===
+                    messageInput
+                ) {
+
+                    setTimeout(() => {
+
+                        try {
+
+                            messageInput.scrollIntoView({
+                                block:
+                                    "nearest",
+                                inline:
+                                    "nearest"
+                            });
+
+                        } catch {}
+                    }, 50);
+                }
+            });
+        }
+    }
+
+    window.visualViewport?.addEventListener(
+        "resize",
+        updateMobileViewport
+    );
+
+    window.visualViewport?.addEventListener(
+        "scroll",
+        updateMobileViewport
+    );
+
+    window.addEventListener(
+        "resize",
+        () => {
+
+            updateMobileViewport();
+
+            if (!isMobile()) {
+
+                removeClass(
+                    bodyElement(),
+                    "mobile-chat-open"
+                );
+
+                removeClass(
+                    bodyElement(),
+                    "sidebar-open"
+                );
+
+                removeClass(
+                    sidebar,
+                    "mobile-open"
+                );
+
+                removeClass(
+                    chatMain,
+                    "mobile-active"
+                );
+
+                mobileChatOpen = false;
+
+            } else if (currentChatUser) {
+
+                if (mobileChatOpen) {
+
+                    addClass(
+                        bodyElement(),
+                        "mobile-chat-open"
+                    );
+
+                    addClass(
+                        chatMain,
+                        "mobile-active"
+                    );
+                }
+            }
+        }
+    );
+
+    updateMobileViewport();
+
     /* =====================================================
        HELPERS
     ===================================================== */
 
     function normalize(value) {
+
         return String(value || "")
             .trim()
             .toLowerCase();
     }
 
     function escapeHTML(value) {
-        const div = document.createElement("div");
-        div.textContent = String(value ?? "");
+
+        const div =
+            document.createElement(
+                "div"
+            );
+
+        div.textContent =
+            String(value ?? "");
+
         return div.innerHTML;
     }
 
     function getInitial(username) {
-        const value = String(username || "?").trim();
+
+        const value =
+            String(username || "?")
+                .trim();
 
         return (
-            value.charAt(0).toUpperCase() ||
+            value.charAt(0)
+                .toUpperCase() ||
             "?"
         );
     }
 
-    function setMessage(element, text) {
+    function setMessage(
+        element,
+        text
+    ) {
+
         if (element) {
-            element.textContent = text || "";
+            element.textContent =
+                text || "";
         }
     }
 
     function isCurrentUser(username) {
+
         if (!currentUser) {
             return false;
         }
 
         return (
-            normalize(currentUser.username) ===
+            normalize(
+                currentUser.username
+            ) ===
             normalize(username)
         );
     }
 
     function createClientID() {
+
         return (
             Date.now().toString(36) +
             "-" +
@@ -172,19 +555,31 @@ document.addEventListener("DOMContentLoaded", () => {
             String(value).trim();
 
         return (
-            avatar.startsWith("data:image/") ||
-            avatar.startsWith("blob:") ||
-            avatar.startsWith("https://") ||
-            avatar.startsWith("http://") ||
+            avatar.startsWith(
+                "data:image/"
+            ) ||
+            avatar.startsWith(
+                "blob:"
+            ) ||
+            avatar.startsWith(
+                "https://"
+            ) ||
+            avatar.startsWith(
+                "http://"
+            ) ||
             avatar.startsWith("/")
         );
     }
 
-    function renderAvatar(value, username = "") {
+    function renderAvatar(
+        value,
+        username = ""
+    ) {
 
         const avatar =
             String(
-                value || getInitial(username)
+                value ||
+                getInitial(username)
             ).trim();
 
         if (isImageAvatar(avatar)) {
@@ -194,7 +589,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     class="avatar-image"
                     src="${escapeHTML(avatar)}"
                     alt="${escapeHTML(
-                        username || "Avatar"
+                        username ||
+                        "Avatar"
                     )}"
                     loading="lazy"
                 >
@@ -204,7 +600,8 @@ document.addEventListener("DOMContentLoaded", () => {
         return `
             <span class="avatar-letter">
                 ${escapeHTML(
-                    avatar || getInitial(username)
+                    avatar ||
+                    getInitial(username)
                 )}
             </span>
         `;
@@ -256,11 +653,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (messageInput) {
-            messageInput.disabled = true;
+            messageInput.disabled =
+                true;
         }
 
         if (sendButton) {
-            sendButton.disabled = true;
+            sendButton.disabled =
+                true;
         }
     }
 
@@ -277,11 +676,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (messageInput) {
-            messageInput.disabled = true;
+            messageInput.disabled =
+                true;
         }
 
         if (sendButton) {
-            sendButton.disabled = true;
+            sendButton.disabled =
+                true;
         }
     }
 
@@ -296,10 +697,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const username =
-            currentUser.username || "User";
+            currentUser.username ||
+            "User";
 
         const avatar =
-            avatarValue(currentUser);
+            avatarValue(
+                currentUser
+            );
 
         if (usernameText) {
             usernameText.textContent =
@@ -340,17 +744,24 @@ document.addEventListener("DOMContentLoaded", () => {
     ) {
 
         const response =
-            await fetch(url, {
-                credentials: "include",
-                ...options
-            });
+            await fetch(
+                url,
+                {
+                    credentials:
+                        "include",
+                    ...options
+                }
+            );
 
         let data = {};
 
         try {
+
             data =
                 await response.json();
+
         } catch {
+
             data = {};
         }
 
@@ -378,7 +789,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 await requestJSON(
                     "/api/me",
                     {
-                        method: "GET"
+                        method:
+                            "GET"
                     }
                 );
 
@@ -421,13 +833,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
             showLoggedOut();
 
-            setTimeout(() => {
+            setTimeout(
+                () => {
 
-                window.location.replace(
-                    "/login.html"
-                );
+                    window.location.replace(
+                        "/login.html"
+                    );
 
-            }, 500);
+                },
+                500
+            );
 
             return false;
         }
@@ -443,7 +858,10 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        if (typeof io !== "function") {
+        if (
+            typeof io !==
+            "function"
+        ) {
 
             console.error(
                 "[SOCKET] Socket.IO chưa được tải."
@@ -462,47 +880,44 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         socket = io({
+
             transports: [
                 "websocket",
                 "polling"
             ],
 
-            withCredentials: true
+            withCredentials:
+                true
         });
 
-        /* =================================================
-           CONNECT
-        ================================================= */
+        socket.on(
+            "connect",
+            () => {
 
-        socket.on("connect", () => {
+                console.log(
+                    "[SOCKET] Connected:",
+                    socket.id
+                );
 
-            console.log(
-                "[SOCKET] Connected:",
-                socket.id
-            );
+                socket.emit(
+                    "user_online",
+                    {
+                        username:
+                            currentUser.username,
 
-            socket.emit(
-                "user_online",
-                {
-                    username:
-                        currentUser.username,
+                        avatar:
+                            currentUser.avatar
+                    }
+                );
 
-                    avatar:
-                        currentUser.avatar
+                loadFriends();
+                loadFriendRequests();
+
+                if (currentChatUser) {
+                    requestHistory();
                 }
-            );
-
-            loadFriends();
-            loadFriendRequests();
-
-            if (currentChatUser) {
-                requestHistory();
             }
-        });
-
-        /* =================================================
-           CONNECT ERROR
-        ================================================= */
+        );
 
         socket.on(
             "connect_error",
@@ -515,10 +930,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         );
 
-        /* =================================================
-           DISCONNECT
-        ================================================= */
-
         socket.on(
             "disconnect",
             reason => {
@@ -529,10 +940,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
             }
         );
-
-        /* =================================================
-           CURRENT USER
-        ================================================= */
 
         socket.on(
             "current_user",
@@ -601,7 +1008,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         receiverIsCurrentChat
                     );
 
-                if (!belongsToCurrentChat) {
+                if (
+                    !belongsToCurrentChat
+                ) {
                     return;
                 }
 
@@ -611,9 +1020,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 scrollMessages();
 
-                if (
-                    !messageIsMine
-                ) {
+                if (!messageIsMine) {
                     playMessageSound();
                 }
             }
@@ -680,7 +1087,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         message.id || ""
                     );
 
-                if (id && messages) {
+                if (
+                    id &&
+                    messages
+                ) {
 
                     const existing =
                         messages.querySelector(
@@ -735,10 +1145,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
             }
         );
-
-        /* =================================================
-           MESSAGE ERROR
-        ================================================= */
 
         socket.on(
             "message_error",
@@ -848,7 +1254,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
 
                 if (friendUsername) {
-                    friendUsername.value = "";
+                    friendUsername.value =
+                        "";
                 }
 
                 loadFriendRequests();
@@ -970,7 +1377,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     normalize(
                         currentChatUser.username
                     ) ===
-                    normalize(oldUsername)
+                    normalize(
+                        oldUsername
+                    )
                 ) {
 
                     currentChatUser.username =
@@ -1061,7 +1470,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
 
             friends =
-                Array.isArray(data.friends)
+                Array.isArray(
+                    data.friends
+                )
                     ? data.friends
                     : [];
 
@@ -1082,7 +1493,8 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        friendsList.innerHTML = "";
+        friendsList.innerHTML =
+            "";
 
         const search =
             normalize(
@@ -1090,16 +1502,18 @@ document.addEventListener("DOMContentLoaded", () => {
             );
 
         const filtered =
-            friends.filter(user => {
+            friends.filter(
+                user => {
 
-                if (!search) {
-                    return true;
+                    if (!search) {
+                        return true;
+                    }
+
+                    return normalize(
+                        user.username
+                    ).includes(search);
                 }
-
-                return normalize(
-                    user.username
-                ).includes(search);
-            });
+            );
 
         if (!filtered.length) {
 
@@ -1117,20 +1531,29 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        filtered.forEach(user => {
+        filtered.forEach(
+            user => {
 
-            friendsList.appendChild(
-                createFriendElement(user)
-            );
-        });
+                friendsList.appendChild(
+                    createFriendElement(
+                        user
+                    )
+                );
+            }
+        );
     }
 
-    function createFriendElement(user) {
+    function createFriendElement(
+        user
+    ) {
 
         const button =
-            document.createElement("button");
+            document.createElement(
+                "button"
+            );
 
-        button.type = "button";
+        button.type =
+            "button";
 
         button.className =
             "dm-user";
@@ -1138,7 +1561,8 @@ document.addEventListener("DOMContentLoaded", () => {
         button.dataset.user =
             user.username;
 
-        button.innerHTML = `
+        button.innerHTML =
+            `
             <span class="dm-avatar">
 
                 ${renderAvatar(
@@ -1175,7 +1599,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         button.addEventListener(
             "click",
-            () => openChat(user)
+            () => {
+
+                openChat(user);
+
+                setMobileMenu(false);
+            }
         );
 
         return button;
@@ -1201,7 +1630,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
 
             friendRequestData =
-                Array.isArray(data.incoming)
+                Array.isArray(
+                    data.incoming
+                )
                     ? data.incoming
                     : [];
 
@@ -1222,7 +1653,8 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        friendRequests.innerHTML = "";
+        friendRequests.innerHTML =
+            "";
 
         friendRequestData.forEach(
             request => {
@@ -1240,7 +1672,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     request.from ||
                     "User";
 
-                item.innerHTML = `
+                item.innerHTML =
+                    `
                     <div class="friend-request-info">
 
                         <strong>
@@ -1274,14 +1707,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     "click",
                     () => {
 
-                        if (!socket?.connected) {
+                        if (
+                            !socket?.connected
+                        ) {
                             return;
                         }
 
                         socket.emit(
                             "accept_friend_request",
                             {
-                                id: request.id
+                                id:
+                                    request.id
                             }
                         );
 
@@ -1300,14 +1736,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     "click",
                     () => {
 
-                        if (!socket?.connected) {
+                        if (
+                            !socket?.connected
+                        ) {
                             return;
                         }
 
                         socket.emit(
                             "reject_friend_request",
                             {
-                                id: request.id
+                                id:
+                                    request.id
                             }
                         );
 
@@ -1333,8 +1772,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (
-            normalize(user.username) ===
-            normalize(currentUser?.username)
+            normalize(
+                user.username
+            ) ===
+            normalize(
+                currentUser?.username
+            )
         ) {
             return;
         }
@@ -1342,11 +1785,15 @@ document.addEventListener("DOMContentLoaded", () => {
         currentChatUser = {
 
             username:
-                String(user.username),
+                String(
+                    user.username
+                ),
 
             avatar:
                 user.avatar ||
-                getInitial(user.username),
+                getInitial(
+                    user.username
+                ),
 
             online:
                 !!user.online
@@ -1365,7 +1812,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (sendButton) {
-            sendButton.disabled = true;
+            sendButton.disabled =
+                true;
         }
 
         clearMessages();
@@ -1375,10 +1823,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 "none";
         }
 
+        /*
+           Mobile chuyển sang màn hình chat.
+        */
+
+        openMobileChat();
+
         requestHistory();
 
         document
-            .querySelectorAll(".dm-user")
+            .querySelectorAll(
+                ".dm-user"
+            )
             .forEach(element => {
 
                 element.classList.toggle(
@@ -1391,6 +1847,24 @@ document.addEventListener("DOMContentLoaded", () => {
                     )
                 );
             });
+
+        /*
+           Focus input chỉ trên PC.
+           Mobile không tự bật bàn phím.
+        */
+
+        if (
+            !isMobile() &&
+            messageInput
+        ) {
+
+            setTimeout(
+                () => {
+                    messageInput.focus();
+                },
+                100
+            );
+        }
     }
 
     /* =====================================================
@@ -1527,11 +2001,14 @@ document.addEventListener("DOMContentLoaded", () => {
     function clearMessages() {
 
         if (messages) {
-            messages.innerHTML = "";
+            messages.innerHTML =
+                "";
         }
     }
 
-    function renderHistory(history) {
+    function renderHistory(
+        history
+    ) {
 
         clearMessages();
 
@@ -1590,10 +2067,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const safeId =
             String(id);
 
-        /* -----------------------------------------------
-           chống message trùng
-        ------------------------------------------------ */
-
         const existing =
             messages.querySelector(
                 `[data-message-id="${CSS.escape(
@@ -1618,7 +2091,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
 
         let avatar =
-            message.avatar || "";
+            message.avatar ||
+            "";
 
         if (!avatar) {
 
@@ -1630,13 +2104,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 avatar =
                     currentUser?.avatar ||
-                    getInitial(username);
+                    getInitial(
+                        username
+                    );
 
             } else {
 
                 avatar =
                     currentChatUser?.avatar ||
-                    getInitial(username);
+                    getInitial(
+                        username
+                    );
             }
         }
 
@@ -1662,25 +2140,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     : "theirs"
             }`;
 
-        /* -----------------------------------------------
-           QUAN TRỌNG
-        ------------------------------------------------ */
-
         row.dataset.messageId =
             safeId;
 
         row.dataset.username =
             username;
 
-        /* =================================================
-           IMAGE
-        ================================================= */
-
-        let imageHTML = "";
+        let imageHTML =
+            "";
 
         if (message.image) {
 
-            imageHTML = `
+            imageHTML =
+                `
                 <div class="message-image-wrap">
 
                     <img
@@ -1696,11 +2168,8 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
         }
 
-        /* =================================================
-           REPLY
-        ================================================= */
-
-        let replyHTML = "";
+        let replyHTML =
+            "";
 
         if (
             message.reply &&
@@ -1708,7 +2177,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 "object"
         ) {
 
-            replyHTML = `
+            replyHTML =
+                `
                 <div class="message-reply">
 
                     <strong>
@@ -1729,15 +2199,13 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
         }
 
-        /* =================================================
-           BUBBLE
-        ================================================= */
-
-        let bubbleHTML = "";
+        let bubbleHTML =
+            "";
 
         if (text) {
 
-            bubbleHTML = `
+            bubbleHTML =
+                `
                 <div class="message-bubble">
 
                     <span class="message-text">
@@ -1748,11 +2216,8 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
         }
 
-        /* =================================================
-           AVATAR
-        ================================================= */
-
-        const avatarHTML = `
+        const avatarHTML =
+            `
             <div
                 class="message-avatar"
                 data-avatar-user="${escapeHTML(
@@ -1766,11 +2231,8 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
         `;
 
-        /* =================================================
-           CONTENT
-        ================================================= */
-
-        const contentHTML = `
+        const contentHTML =
+            `
             <div class="message-content">
 
                 ${replyHTML}
@@ -1799,10 +2261,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 contentHTML;
         }
 
-        /* =================================================
-           DOUBLE CLICK = REPLY
-        ================================================= */
-
         row.addEventListener(
             "dblclick",
             () => {
@@ -1822,7 +2280,9 @@ document.addEventListener("DOMContentLoaded", () => {
        TIME
     ===================================================== */
 
-    function formatTime(timestamp) {
+    function formatTime(
+        timestamp
+    ) {
 
         if (
             timestamp === undefined ||
@@ -1853,8 +2313,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 .toLocaleTimeString(
                     "vi-VN",
                     {
-                        hour: "2-digit",
-                        minute: "2-digit"
+                        hour:
+                            "2-digit",
+
+                        minute:
+                            "2-digit"
                     }
                 );
 
@@ -1870,11 +2333,13 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        requestAnimationFrame(() => {
+        requestAnimationFrame(
+            () => {
 
-            messages.scrollTop =
-                messages.scrollHeight;
-        });
+                messages.scrollTop =
+                    messages.scrollHeight;
+            }
+        );
     }
 
     /* =====================================================
@@ -1883,7 +2348,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function sendMessage() {
 
-        if (!socket?.connected) {
+        if (
+            !socket?.connected
+        ) {
 
             alert(
                 "Chưa kết nối máy chủ."
@@ -1901,7 +2368,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const text =
             messageInput?.value
-                ?.trim() || "";
+                ?.trim() ||
+            "";
 
         if (!text) {
             return;
@@ -1964,7 +2432,9 @@ document.addEventListener("DOMContentLoaded", () => {
        SEND IMAGE
     ===================================================== */
 
-    function sendImageFile(file) {
+    function sendImageFile(
+        file
+    ) {
 
         if (!file) {
             return;
@@ -1977,7 +2447,9 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        if (!socket?.connected) {
+        if (
+            !socket?.connected
+        ) {
 
             alert(
                 "Chưa kết nối máy chủ."
@@ -2014,60 +2486,63 @@ document.addEventListener("DOMContentLoaded", () => {
         const reader =
             new FileReader();
 
-        reader.onload = () => {
+        reader.onload =
+            () => {
 
-            const image =
-                String(
-                    reader.result || ""
+                const image =
+                    String(
+                        reader.result ||
+                        ""
+                    );
+
+                socket.emit(
+                    "private_message",
+                    {
+
+                        id:
+                            createClientID(),
+
+                        to:
+                            currentChatUser.username,
+
+                        text:
+                            "",
+
+                        image,
+
+                        time:
+                            Date.now(),
+
+                        reply:
+                            replyingTo
+                                ? {
+                                    username:
+                                        replyingTo.username ||
+                                        "",
+
+                                    text:
+                                        String(
+                                            replyingTo.text ||
+                                            ""
+                                        ).slice(
+                                            0,
+                                            1000
+                                        )
+                                }
+                                : null
+                    }
                 );
 
-            socket.emit(
-                "private_message",
-                {
+                cancelReplyAction();
+            };
 
-                    id:
-                        createClientID(),
+        reader.onerror =
+            () => {
 
-                    to:
-                        currentChatUser.username,
-
-                    text:
-                        "",
-
-                    image,
-
-                    time:
-                        Date.now(),
-
-                    reply:
-                        replyingTo
-                            ? {
-                                username:
-                                    replyingTo.username ||
-                                    "",
-
-                                text:
-                                    String(
-                                        replyingTo.text ||
-                                        ""
-                                    ).slice(
-                                        0,
-                                        1000
-                                    )
-                            }
-                            : null
-                }
-            );
-
-            cancelReplyAction();
-        };
-
-        reader.onerror = () => {
-
-            alert(
-                "Không đọc được ảnh."
-            );
-        };
+                alert(
+                    "Không đọc được ảnh."
+                );
+            };
 
         reader.readAsDataURL(
             file
@@ -2137,7 +2612,9 @@ document.addEventListener("DOMContentLoaded", () => {
        REPLY
     ===================================================== */
 
-    function setReply(message) {
+    function setReply(
+        message
+    ) {
 
         replyingTo =
             message;
@@ -2198,99 +2675,99 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        /* -----------------------------------------------
-           FRIEND LIST
-        ------------------------------------------------ */
-
         document
             .querySelectorAll(
                 ".dm-user"
             )
-            .forEach(element => {
+            .forEach(
+                element => {
 
-                if (
-                    normalize(
-                        element.dataset.user
-                    ) !==
-                    normalize(username)
-                ) {
-                    return;
+                    if (
+                        normalize(
+                            element.dataset.user
+                        ) !==
+                        normalize(
+                            username
+                        )
+                    ) {
+                        return;
+                    }
+
+                    const target =
+                        element.querySelector(
+                            ".dm-avatar"
+                        );
+
+                    if (!target) {
+                        return;
+                    }
+
+                    target.innerHTML =
+                        renderAvatar(
+                            avatar,
+                            username
+                        );
+
+                    const presence =
+                        document.createElement(
+                            "i"
+                        );
+
+                    presence.className =
+                        "presence";
+
+                    const oldPresence =
+                        element.querySelector(
+                            ".presence.online"
+                        );
+
+                    if (oldPresence) {
+
+                        presence.classList.add(
+                            "online"
+                        );
+                    }
+
+                    target.appendChild(
+                        presence
+                    );
                 }
-
-                const target =
-                    element.querySelector(
-                        ".dm-avatar"
-                    );
-
-                if (!target) {
-                    return;
-                }
-
-                target.innerHTML =
-                    renderAvatar(
-                        avatar,
-                        username
-                    );
-
-                const presence =
-                    document.createElement(
-                        "i"
-                    );
-
-                presence.className =
-                    "presence";
-
-                const oldPresence =
-                    element.querySelector(
-                        ".presence.online"
-                    );
-
-                if (oldPresence) {
-
-                    presence.classList.add(
-                        "online"
-                    );
-                }
-
-                target.appendChild(
-                    presence
-                );
-            });
-
-        /* -----------------------------------------------
-           MESSAGE AVATAR
-        ------------------------------------------------ */
+            );
 
         document
             .querySelectorAll(
                 ".message-row"
             )
-            .forEach(row => {
+            .forEach(
+                row => {
 
-                if (
-                    normalize(
-                        row.dataset.username
-                    ) !==
-                    normalize(username)
-                ) {
-                    return;
+                    if (
+                        normalize(
+                            row.dataset.username
+                        ) !==
+                        normalize(
+                            username
+                        )
+                    ) {
+                        return;
+                    }
+
+                    const avatarElement =
+                        row.querySelector(
+                            ".message-avatar"
+                        );
+
+                    if (!avatarElement) {
+                        return;
+                    }
+
+                    avatarElement.innerHTML =
+                        renderAvatar(
+                            avatar,
+                            username
+                        );
                 }
-
-                const avatarElement =
-                    row.querySelector(
-                        ".message-avatar"
-                    );
-
-                if (!avatarElement) {
-                    return;
-                }
-
-                avatarElement.innerHTML =
-                    renderAvatar(
-                        avatar,
-                        username
-                    );
-            });
+            );
     }
 
     /* =====================================================
@@ -2306,40 +2783,44 @@ document.addEventListener("DOMContentLoaded", () => {
             .querySelectorAll(
                 ".dm-user"
             )
-            .forEach(item => {
+            .forEach(
+                item => {
 
-                if (
-                    normalize(
-                        item.dataset.user
-                    ) !==
-                    normalize(username)
-                ) {
-                    return;
-                }
+                    if (
+                        normalize(
+                            item.dataset.user
+                        ) !==
+                        normalize(
+                            username
+                        )
+                    ) {
+                        return;
+                    }
 
-                const presence =
-                    item.querySelector(
-                        ".presence"
+                    const presence =
+                        item.querySelector(
+                            ".presence"
+                        );
+
+                    presence?.classList.toggle(
+                        "online",
+                        !!online
                     );
 
-                presence?.classList.toggle(
-                    "online",
-                    !!online
-                );
+                    const small =
+                        item.querySelector(
+                            ".dm-user-info small"
+                        );
 
-                const small =
-                    item.querySelector(
-                        ".dm-user-info small"
-                    );
+                    if (small) {
 
-                if (small) {
-
-                    small.textContent =
-                        online
-                            ? "Đang hoạt động"
-                            : "Offline";
+                        small.textContent =
+                            online
+                                ? "Đang hoạt động"
+                                : "Offline";
+                    }
                 }
-            });
+            );
     }
 
     /* =====================================================
@@ -2353,6 +2834,8 @@ document.addEventListener("DOMContentLoaded", () => {
             addFriendModal?.classList.remove(
                 "hidden"
             );
+
+            setMobileMenu(false);
 
             friendUsername?.focus();
         }
@@ -2391,7 +2874,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function sendFriend() {
 
-        if (!socket?.connected) {
+        if (
+            !socket?.connected
+        ) {
 
             setMessage(
                 friendMessage,
@@ -2403,7 +2888,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const username =
             friendUsername?.value
-                ?.trim() || "";
+                ?.trim() ||
+            "";
 
         if (!username) {
 
@@ -2473,6 +2959,35 @@ document.addEventListener("DOMContentLoaded", () => {
     ===================================================== */
 
     messageInput?.addEventListener(
+        "focus",
+        () => {
+
+            updateMobileViewport();
+
+            if (isMobile()) {
+
+                setTimeout(
+                    () => {
+
+                        try {
+
+                            messageInput.scrollIntoView({
+                                block:
+                                    "nearest"
+                            });
+
+                        } catch {}
+
+                        scrollMessages();
+
+                    },
+                    150
+                );
+            }
+        }
+    );
+
+    messageInput?.addEventListener(
         "input",
         () => {
 
@@ -2503,7 +3018,8 @@ document.addEventListener("DOMContentLoaded", () => {
         event => {
 
             if (
-                event.key === "Enter" &&
+                event.key ===
+                "Enter" &&
                 !event.shiftKey
             ) {
 
@@ -2551,7 +3067,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 sendImageFile(file);
             }
 
-            imageInput.value = "";
+            imageInput.value =
+                "";
         }
     );
 
@@ -2571,6 +3088,8 @@ document.addEventListener("DOMContentLoaded", () => {
             settingsModal?.classList.remove(
                 "hidden"
             );
+
+            setMobileMenu(false);
         }
     );
 
@@ -2608,42 +3127,49 @@ document.addEventListener("DOMContentLoaded", () => {
         .querySelectorAll(
             ".settings-tab"
         )
-        .forEach(button => {
+        .forEach(
+            button => {
 
-            button.addEventListener(
-                "click",
-                () => {
+                button.addEventListener(
+                    "click",
+                    () => {
 
-                    const page =
-                        button.dataset.page;
+                        const page =
+                            button.dataset.page;
 
-                    document
-                        .querySelectorAll(
-                            ".settings-tab"
-                        )
-                        .forEach(item => {
+                        document
+                            .querySelectorAll(
+                                ".settings-tab"
+                            )
+                            .forEach(
+                                item => {
 
-                            item.classList.toggle(
-                                "active",
-                                item === button
+                                    item.classList.toggle(
+                                        "active",
+                                        item ===
+                                        button
+                                    );
+                                }
                             );
-                        });
 
-                    document
-                        .querySelectorAll(
-                            ".settings-page"
-                        )
-                        .forEach(item => {
+                        document
+                            .querySelectorAll(
+                                ".settings-page"
+                            )
+                            .forEach(
+                                item => {
 
-                            item.classList.toggle(
-                                "hidden",
-                                item.id !==
-                                `page-${page}`
+                                    item.classList.toggle(
+                                        "hidden",
+                                        item.id !==
+                                        `page-${page}`
+                                    );
+                                }
                             );
-                        });
-                }
-            );
-        });
+                    }
+                );
+            }
+        );
 
     /* =====================================================
        USERNAME
@@ -2653,7 +3179,9 @@ document.addEventListener("DOMContentLoaded", () => {
         "click",
         () => {
 
-            if (!socket?.connected) {
+            if (
+                !socket?.connected
+            ) {
 
                 setMessage(
                     usernameMessage,
@@ -2665,7 +3193,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const value =
                 newUsername?.value
-                    ?.trim() || "";
+                    ?.trim() ||
+                "";
 
             if (
                 value.length < 2 ||
@@ -2683,7 +3212,8 @@ document.addEventListener("DOMContentLoaded", () => {
             socket.emit(
                 "change_username",
                 {
-                    username: value
+                    username:
+                        value
                 }
             );
         }
@@ -2697,23 +3227,26 @@ document.addEventListener("DOMContentLoaded", () => {
         .querySelectorAll(
             ".collection-avatar"
         )
-        .forEach(button => {
+        .forEach(
+            button => {
 
-            button.addEventListener(
-                "click",
-                () => {
+                button.addEventListener(
+                    "click",
+                    () => {
 
-                    const avatar =
-                        button.dataset.avatar;
+                        const avatar =
+                            button.dataset.avatar;
 
-                    if (avatar) {
-                        updateAvatar(
-                            avatar
-                        );
+                        if (avatar) {
+
+                            updateAvatar(
+                                avatar
+                            );
+                        }
                     }
-                }
-            );
-        });
+                );
+            }
+        );
 
     /* =====================================================
        AVATAR UPLOAD
@@ -2764,29 +3297,32 @@ document.addEventListener("DOMContentLoaded", () => {
             const reader =
                 new FileReader();
 
-            reader.onload = () => {
+            reader.onload =
+                () => {
 
-                const avatar =
-                    String(
-                        reader.result || ""
+                    const avatar =
+                        String(
+                            reader.result ||
+                            ""
+                        );
+
+                    currentUser.avatar =
+                        avatar;
+
+                    updateCurrentUserUI();
+
+                    updateAvatar(
+                        avatar
                     );
+                };
 
-                currentUser.avatar =
-                    avatar;
+            reader.onerror =
+                () => {
 
-                updateCurrentUserUI();
-
-                updateAvatar(
-                    avatar
-                );
-            };
-
-            reader.onerror = () => {
-
-                alert(
-                    "Không đọc được ảnh."
-                );
-            };
+                    alert(
+                        "Không đọc được ảnh."
+                    );
+                };
 
             reader.readAsDataURL(
                 file
@@ -2801,7 +3337,9 @@ document.addEventListener("DOMContentLoaded", () => {
         avatar
     ) {
 
-        if (!socket?.connected) {
+        if (
+            !socket?.connected
+        ) {
 
             alert(
                 "Chưa kết nối máy chủ."
@@ -2846,10 +3384,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (
         localStorage.getItem(
             "m4_dark_mode"
-        ) === "light"
+        ) ===
+        "light"
     ) {
 
         if (darkToggle) {
+
             darkToggle.checked =
                 false;
         }
@@ -2946,6 +3486,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 0.08
             );
 
+            setTimeout(
+                () => {
+
+                    try {
+                        context.close();
+                    } catch {}
+
+                },
+                200
+            );
+
         } catch {}
     }
 
@@ -2966,8 +3517,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 await fetch(
                     "/api/logout",
                     {
-                        method: "POST",
-                        credentials: "include"
+                        method:
+                            "POST",
+
+                        credentials:
+                            "include"
                     }
                 );
 
@@ -3001,44 +3555,48 @@ document.addEventListener("DOMContentLoaded", () => {
             .querySelectorAll(
                 ".dm-user"
             )
-            .forEach(button => {
+            .forEach(
+                button => {
 
-                button.addEventListener(
-                    "click",
-                    async () => {
+                    button.addEventListener(
+                        "click",
+                        async () => {
 
-                        const username =
-                            button.dataset.user;
+                            const username =
+                                button.dataset.user;
 
-                        if (!username) {
-                            return;
-                        }
-
-                        try {
-
-                            const data =
-                                await requestJSON(
-                                    `/api/user/${encodeURIComponent(
-                                        username
-                                    )}`
-                                );
-
-                            if (data?.user) {
-
-                                openChat(
-                                    data.user
-                                );
+                            if (!username) {
+                                return;
                             }
 
-                        } catch {
+                            try {
 
-                            alert(
-                                `Không tìm thấy tài khoản "${username}".`
-                            );
+                                const data =
+                                    await requestJSON(
+                                        `/api/user/${encodeURIComponent(
+                                            username
+                                        )}`
+                                    );
+
+                                if (
+                                    data?.user
+                                ) {
+
+                                    openChat(
+                                        data.user
+                                    );
+                                }
+
+                            } catch {
+
+                                alert(
+                                    `Không tìm thấy tài khoản "${username}".`
+                                );
+                            }
                         }
-                    }
-                );
-            });
+                    );
+                }
+            );
     }
 
     /* =====================================================
@@ -3063,7 +3621,58 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
 
                 cancelReplyAction();
+
+                if (isMobile()) {
+                    setMobileMenu(false);
+                }
             }
+        }
+    );
+
+    /* =====================================================
+       BACK BUTTON AND MOBILE NAVIGATION
+    ===================================================== */
+
+    window.addEventListener(
+        "popstate",
+        () => {
+
+            if (
+                isMobile() &&
+                mobileChatOpen
+            ) {
+
+                closeMobileChat();
+            }
+        }
+    );
+
+    /*
+       Android browser back:
+       nếu đang chat thì xử lý ở app trước.
+    */
+
+    window.addEventListener(
+        "beforeunload",
+        () => {
+
+            try {
+
+                if (
+                    socket?.connected &&
+                    currentUser
+                ) {
+
+                    socket.emit(
+                        "user_offline",
+                        {
+                            username:
+                                currentUser.username
+                        }
+                    );
+                }
+
+            } catch {}
         }
     );
 
@@ -3097,6 +3706,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
         await loadFriendRequests();
 
+        /*
+           Sau khi load xong, đảm bảo trạng thái
+           mobile không bị kẹt.
+        */
+
+        if (!isMobile()) {
+
+            removeClass(
+                bodyElement(),
+                "mobile-chat-open"
+            );
+
+            removeClass(
+                bodyElement(),
+                "sidebar-open"
+            );
+
+        }
+
+        updateMobileViewport();
+
         console.log(
             "[M4 CHAT] App started:",
             currentUser.username
@@ -3104,4 +3734,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     startApp();
+
 });
