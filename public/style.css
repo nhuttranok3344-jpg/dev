@@ -1,13 +1,18 @@
 /* =========================================================
-   M4 CHAT - FULL STYLE.CSS
-   Layout:
-   LEFT SERVER BAR | DM SIDEBAR | CHAT | PROFILE
+   M4 CHAT — FULL RESPONSIVE STYLE
+   PC + LAPTOP + TABLET + MOBILE
 ========================================================= */
 
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
 }
 
 :root {
@@ -32,14 +37,8 @@
 }
 
 /* =========================================================
-   BODY
+   BASE
 ========================================================= */
-
-html,
-body {
-    width: 100%;
-    height: 100%;
-}
 
 body {
     font-family:
@@ -54,6 +53,25 @@ body {
     color: var(--text);
 
     overflow: hidden;
+
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+
+    overscroll-behavior: none;
+}
+
+button,
+input {
+    font: inherit;
+}
+
+button {
+    -webkit-tap-highlight-color: transparent;
+}
+
+input {
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 /* =========================================================
@@ -63,6 +81,7 @@ body {
 .app {
     width: 100%;
     height: 100vh;
+    height: 100dvh;
 
     display: grid;
 
@@ -80,7 +99,7 @@ body {
 ========================================================= */
 
 .server-bar {
-    height: 100vh;
+    height: 100%;
 
     background: #080a0f;
 
@@ -91,6 +110,8 @@ body {
     align-items: center;
 
     padding: 14px 0;
+
+    overflow: hidden;
 }
 
 .server-logo {
@@ -111,11 +132,14 @@ body {
     justify-content: center;
 
     color: white;
+
     font-size: 15px;
     font-weight: 900;
 
     box-shadow:
         0 8px 25px rgba(88,101,242,.25);
+
+    flex-shrink: 0;
 }
 
 .server-divider {
@@ -125,6 +149,8 @@ body {
     background: var(--border);
 
     margin: 16px 0 10px;
+
+    flex-shrink: 0;
 }
 
 .server-icon {
@@ -148,6 +174,8 @@ body {
         background .18s ease,
         color .18s ease,
         transform .18s ease;
+
+    flex-shrink: 0;
 }
 
 .server-icon:hover {
@@ -174,7 +202,9 @@ body {
 ========================================================= */
 
 .dm-sidebar {
-    height: 100vh;
+    height: 100%;
+
+    min-width: 0;
 
     background: var(--bg-sidebar);
 
@@ -183,13 +213,16 @@ body {
     display: flex;
     flex-direction: column;
 
-    min-width: 0;
+    overflow: hidden;
 }
 
-/* HEADER */
+/* =========================================================
+   DM HEADER
+========================================================= */
 
 .dm-header {
     height: 64px;
+    min-height: 64px;
 
     padding: 0 16px;
 
@@ -198,11 +231,15 @@ body {
     justify-content: space-between;
 
     border-bottom: 1px solid var(--border);
+
+    flex-shrink: 0;
 }
 
 .dm-header strong {
     font-size: 17px;
     font-weight: 800;
+
+    white-space: nowrap;
 }
 
 .header-add {
@@ -221,16 +258,22 @@ body {
     cursor: pointer;
 
     transition: .18s ease;
+
+    flex-shrink: 0;
 }
 
 .header-add:hover {
     background: var(--accent);
 }
 
-/* SEARCH */
+/* =========================================================
+   SEARCH
+========================================================= */
 
 .friend-search-wrap {
     padding: 12px;
+
+    flex-shrink: 0;
 }
 
 .friend-search-wrap input {
@@ -263,7 +306,9 @@ body {
     color: #70798a;
 }
 
-/* SECTION */
+/* =========================================================
+   SECTION
+========================================================= */
 
 .dm-section-title {
     padding: 8px 14px;
@@ -275,14 +320,25 @@ body {
     font-weight: 800;
 
     letter-spacing: .08em;
+
+    flex-shrink: 0;
 }
 
-/* LIST */
+/* =========================================================
+   LIST
+========================================================= */
 
 .dm-list {
     padding: 2px 8px;
 
     overflow-y: auto;
+    overflow-x: hidden;
+
+    min-height: 0;
+
+    -webkit-overflow-scrolling: touch;
+
+    overscroll-behavior: contain;
 }
 
 .dm-list::-webkit-scrollbar {
@@ -294,7 +350,9 @@ body {
     border-radius: 10px;
 }
 
-/* USER */
+/* =========================================================
+   USER
+========================================================= */
 
 .dm-user {
     width: 100%;
@@ -330,7 +388,9 @@ body {
     background: #202631;
 }
 
-/* DM AVATAR */
+/* =========================================================
+   AVATAR
+========================================================= */
 
 .dm-avatar {
     width: 40px;
@@ -352,15 +412,17 @@ body {
     font-weight: 700;
 
     position: relative;
+
+    flex-shrink: 0;
 }
 
 .dm-avatar img {
     width: 100%;
     height: 100%;
 
-    display: block;
-
     object-fit: cover;
+
+    display: block;
 }
 
 .avatar-letter {
@@ -372,7 +434,9 @@ body {
     justify-content: center;
 }
 
-/* PRESENCE */
+/* =========================================================
+   PRESENCE
+========================================================= */
 
 .presence {
     position: absolute;
@@ -394,7 +458,9 @@ body {
     background: var(--online);
 }
 
-/* USER INFO */
+/* =========================================================
+   USER INFO
+========================================================= */
 
 .dm-user-info {
     min-width: 0;
@@ -403,6 +469,8 @@ body {
     flex-direction: column;
 
     gap: 3px;
+
+    flex: 1;
 }
 
 .dm-user-info strong {
@@ -423,10 +491,14 @@ body {
     text-overflow: ellipsis;
 }
 
-/* REQUESTS */
+/* =========================================================
+   REQUESTS
+========================================================= */
 
 .friend-requests {
     padding: 0 8px;
+
+    flex-shrink: 0;
 }
 
 .friend-request {
@@ -458,11 +530,14 @@ body {
     align-items: center;
 
     gap: 8px;
+
+    flex-shrink: 0;
 }
 
 .user-panel-avatar {
     width: 38px;
     height: 38px;
+
     min-width: 38px;
 
     padding: 0;
@@ -484,6 +559,8 @@ body {
     font-weight: 800;
 
     cursor: pointer;
+
+    flex-shrink: 0;
 }
 
 .user-panel-avatar img {
@@ -491,6 +568,7 @@ body {
     height: 100%;
 
     object-fit: cover;
+
     display: block;
 }
 
@@ -531,6 +609,8 @@ body {
     color: #7f899a;
 
     cursor: pointer;
+
+    flex-shrink: 0;
 }
 
 .user-panel-button:hover {
@@ -543,7 +623,7 @@ body {
 ========================================================= */
 
 .chat {
-    height: 100vh;
+    height: 100%;
 
     min-width: 0;
 
@@ -551,6 +631,8 @@ body {
 
     display: flex;
     flex-direction: column;
+
+    overflow: hidden;
 }
 
 /* =========================================================
@@ -568,6 +650,10 @@ body {
     justify-content: space-between;
 
     padding: 0 18px;
+
+    gap: 10px;
+
+    flex-shrink: 0;
 }
 
 .chat-user {
@@ -577,6 +663,8 @@ body {
     gap: 10px;
 
     min-width: 0;
+
+    flex: 1;
 }
 
 .chat-avatar {
@@ -596,6 +684,8 @@ body {
 
     color: white;
     font-weight: 700;
+
+    flex-shrink: 0;
 }
 
 .chat-avatar img {
@@ -637,6 +727,8 @@ body {
 .chat-actions {
     display: flex;
     gap: 5px;
+
+    flex-shrink: 0;
 }
 
 .chat-actions button {
@@ -661,6 +753,34 @@ body {
 }
 
 /* =========================================================
+   MOBILE BACK BUTTON
+========================================================= */
+
+.mobile-back-button {
+    display: none;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+
+    border: 0;
+    border-radius: 9px;
+
+    background: #171c25;
+
+    color: white;
+
+    font-size: 20px;
+
+    cursor: pointer;
+
+    flex-shrink: 0;
+}
+
+/* =========================================================
    MESSAGES
 ========================================================= */
 
@@ -670,6 +790,7 @@ body {
     min-height: 0;
 
     overflow-y: auto;
+    overflow-x: hidden;
 
     padding: 18px 22px 12px;
 
@@ -679,6 +800,10 @@ body {
     gap: 2px;
 
     scroll-behavior: smooth;
+
+    -webkit-overflow-scrolling: touch;
+
+    overscroll-behavior: contain;
 }
 
 .messages::-webkit-scrollbar {
@@ -755,20 +880,19 @@ body {
 
 /* =========================================================
    MESSAGE CONTENT
-   FIX:
-   - Khung tin nhắn ôm sát nội dung
-   - Tin ngắn không bị kéo dài
 ========================================================= */
 
 .message-content {
-    width: fit-content;
+    width: auto !important;
 
-    max-width: min(65%, 540px);
+    max-width: min(65%, 540px) !important;
+
+    flex: 0 1 auto !important;
+
+    min-width: 0;
 
     display: flex;
     flex-direction: column;
-
-    min-width: 0;
 }
 
 .message-row.mine .message-content {
@@ -780,13 +904,15 @@ body {
 }
 
 /* =========================================================
-   BUBBLE
+   MESSAGE BUBBLE
 ========================================================= */
 
 .message-bubble {
-    width: fit-content;
+    width: fit-content !important;
 
-    max-width: 100%;
+    max-width: 100% !important;
+
+    display: inline-block !important;
 
     padding: 7px 11px;
 
@@ -799,11 +925,7 @@ body {
     word-break: break-word;
 
     overflow-wrap: anywhere;
-
-    display: inline-block;
 }
-
-/* MINE */
 
 .message-row.mine .message-bubble {
     background: var(--mine);
@@ -813,8 +935,6 @@ body {
     border-bottom-right-radius: 5px;
 }
 
-/* THEIRS */
-
 .message-row.theirs .message-bubble {
     background: var(--theirs);
 
@@ -823,14 +943,12 @@ body {
     border-bottom-left-radius: 5px;
 }
 
-/* TEXT */
-
 .message-text {
     white-space: pre-wrap;
 }
 
 /* =========================================================
-   IMAGE MESSAGE
+   MESSAGE IMAGE
 ========================================================= */
 
 .message-image-wrap {
@@ -866,8 +984,6 @@ body {
 .message-image:hover {
     filter: brightness(.94);
 }
-
-/* IMAGE + TEXT */
 
 .message-image-wrap + .message-bubble {
     margin-top: 3px;
@@ -911,6 +1027,8 @@ body {
     color: #818a9b;
 
     font-size: 11px;
+
+    flex-shrink: 0;
 }
 
 /* =========================================================
@@ -933,6 +1051,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
+
+    flex-shrink: 0;
 }
 
 .reply-bar.hidden {
@@ -941,6 +1061,8 @@ body {
 
 .reply-content {
     min-width: 0;
+
+    flex: 1;
 }
 
 .reply-content > span {
@@ -982,6 +1104,8 @@ body {
     font-size: 21px;
 
     cursor: pointer;
+
+    flex-shrink: 0;
 }
 
 /* =========================================================
@@ -997,12 +1121,8 @@ body {
     align-items: center;
 
     gap: 8px;
-}
 
-.composer::before {
-    content: "";
-
-    position: absolute;
+    flex-shrink: 0;
 }
 
 #messageInput {
@@ -1053,6 +1173,8 @@ body {
     cursor: pointer;
 
     transition: .18s ease;
+
+    flex-shrink: 0;
 }
 
 .composer-button {
@@ -1091,17 +1213,19 @@ body {
 }
 
 /* =========================================================
-   RIGHT PROFILE
+   PROFILE
 ========================================================= */
 
 .profile-panel {
-    height: 100vh;
+    height: 100%;
 
     background: var(--bg-sidebar);
 
     border-left: 1px solid var(--border);
 
     overflow-y: auto;
+
+    min-width: 0;
 }
 
 .profile-cover {
@@ -1263,6 +1387,8 @@ body {
     color: #858e9e;
 
     padding: 20px;
+
+    max-width: 500px;
 }
 
 .welcome-icon {
@@ -1323,6 +1449,10 @@ body {
 .modal-box {
     width: min(430px, 100%);
 
+    max-height: 90dvh;
+
+    overflow-y: auto;
+
     background: #11151d;
 
     border: 1px solid var(--border);
@@ -1370,6 +1500,8 @@ body {
     font-size: 20px;
 
     cursor: pointer;
+
+    flex-shrink: 0;
 }
 
 .modal-box > label {
@@ -1609,6 +1741,10 @@ body {
 
     font-size: 19px;
     font-weight: 800;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .account-avatar img {
@@ -1625,6 +1761,8 @@ body {
     flex-direction: column;
 
     gap: 4px;
+
+    min-width: 0;
 }
 
 .account-card strong {
@@ -1658,6 +1796,8 @@ body {
     flex-direction: column;
 
     gap: 4px;
+
+    min-width: 0;
 }
 
 .setting-item strong {
@@ -1674,6 +1814,8 @@ body {
     display: flex;
 
     gap: 6px;
+
+    flex-shrink: 0;
 }
 
 .username-change input {
@@ -1792,6 +1934,10 @@ body {
 
     font-size: 34px;
     font-weight: 800;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .settings-avatar img {
@@ -1831,6 +1977,8 @@ body {
     justify-content: center;
 
     gap: 10px;
+
+    flex-wrap: wrap;
 }
 
 .collection-avatar {
@@ -1855,36 +2003,6 @@ body {
 }
 
 /* =========================================================
-   GENERIC AVATAR
-========================================================= */
-
-.avatar-image {
-    width: 100%;
-    height: 100%;
-
-    object-fit: cover;
-
-    display: block;
-}
-
-.avatar-letter {
-    width: 100%;
-    height: 100%;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* =========================================================
-   PAGE FOOTER / MISC
-========================================================= */
-
-.page-footer {
-    display: none;
-}
-
-/* =========================================================
    LIGHT MODE
 ========================================================= */
 
@@ -1905,22 +2023,21 @@ body.light-mode {
    TABLET
 ========================================================= */
 
-@media (max-width: 1100px) {
+@media (max-width: 1100px) and (min-width: 761px) {
 
     .app {
         grid-template-columns:
             58px
             240px
-            minmax(0, 1fr)
-            0;
+            minmax(0, 1fr);
     }
 
     .profile-panel {
-        display: none;
+        display: none !important;
     }
 
     .message-content {
-        max-width: 70%;
+        max-width: 72% !important;
     }
 }
 
@@ -1930,28 +2047,333 @@ body.light-mode {
 
 @media (max-width: 760px) {
 
+    html,
     body {
+        width: 100%;
+        height: 100%;
+        height: 100dvh;
+
         overflow: hidden;
     }
 
-    .app {
-        grid-template-columns:
-            0
-            230px
-            minmax(0, 1fr)
-            0;
+    body {
+        position: fixed;
+
+        inset: 0;
+
+        overscroll-behavior: none;
     }
+
+    /* =====================================================
+       APP
+    ===================================================== */
+
+    .app {
+        display: block !important;
+
+        position: relative;
+
+        width: 100%;
+        height: 100%;
+        height: 100dvh;
+
+        overflow: hidden;
+    }
+
+    /* =====================================================
+       SERVER BAR
+    ===================================================== */
 
     .server-bar {
-        display: none;
+        display: none !important;
     }
 
+    /* =====================================================
+       MOBILE SIDEBAR
+    ===================================================== */
+
     .dm-sidebar {
+        position: absolute;
+
+        inset: 0;
+
+        width: 100%;
+        height: 100%;
+        height: 100dvh;
+
+        min-width: 0;
+
+        border-right: 0;
+
+        transform: translateX(0);
+
+        transition:
+            transform .24s cubic-bezier(.4,0,.2,1);
+
+        z-index: 20;
+
+        overflow: hidden;
+    }
+
+    /* =====================================================
+       MOBILE CHAT
+    ===================================================== */
+
+    .chat {
+        position: absolute;
+
+        inset: 0;
+
+        width: 100%;
+        height: 100%;
+        height: 100dvh;
+
+        min-width: 0;
+
+        transform: translateX(100%);
+
+        transition:
+            transform .24s cubic-bezier(.4,0,.2,1);
+
+        z-index: 30;
+
+        overflow: hidden;
+    }
+
+    /* =====================================================
+       OPEN CHAT
+    ===================================================== */
+
+    body.mobile-chat-open .dm-sidebar {
+        transform: translateX(-100%);
+
+        pointer-events: none;
+    }
+
+    body.mobile-chat-open .chat {
+        transform: translateX(0);
+
+        pointer-events: auto;
+    }
+
+    /* =====================================================
+       DM HEADER
+    ===================================================== */
+
+    .dm-header {
+        height: 58px;
+        min-height: 58px;
+
+        padding: 0 12px;
+    }
+
+    .dm-header strong {
+        font-size: 17px;
+    }
+
+    .header-add {
+        width: 36px;
+        height: 36px;
+
+        border-radius: 10px;
+
+        font-size: 22px;
+    }
+
+    /* =====================================================
+       SEARCH
+    ===================================================== */
+
+    .friend-search-wrap {
+        padding: 9px 10px;
+    }
+
+    .friend-search-wrap input {
+        width: 100%;
+        height: 42px;
+
+        border-radius: 10px;
+
+        font-size: 16px;
+    }
+
+    /* =====================================================
+       SECTION
+    ===================================================== */
+
+    .dm-section-title {
+        padding: 9px 13px;
+
+        font-size: 10px;
+    }
+
+    /* =====================================================
+       LIST
+    ===================================================== */
+
+    .dm-list {
+        flex: 1;
+
+        min-height: 0;
+
+        overflow-y: auto;
+        overflow-x: hidden;
+
+        padding: 2px 8px 8px;
+
+        -webkit-overflow-scrolling: touch;
+
+        overscroll-behavior: contain;
+    }
+
+    .dm-user {
+        width: 100%;
+
+        min-height: 58px;
+
+        padding: 8px;
+
+        margin-bottom: 2px;
+
+        border-radius: 10px;
+
+        gap: 10px;
+    }
+
+    .dm-avatar {
+        width: 43px;
+        height: 43px;
+
+        min-width: 43px;
+    }
+
+    .dm-user-info strong {
+        font-size: 14px;
+    }
+
+    .dm-user-info small {
+        font-size: 11px;
+    }
+
+    /* =====================================================
+       USER PANEL
+    ===================================================== */
+
+    .user-panel {
+        min-height: 62px;
+
+        padding:
+            9px
+            10px
+            calc(
+                9px +
+                env(safe-area-inset-bottom)
+            );
+
+        flex-shrink: 0;
+    }
+
+    .user-panel-avatar {
+        width: 40px;
+        height: 40px;
+
+        min-width: 40px;
+    }
+
+    /* =====================================================
+       CHAT HEADER
+    ===================================================== */
+
+    .chat-header {
+        height: 58px;
+        min-height: 58px;
+
+        padding: 0 8px;
+
+        gap: 5px;
+    }
+
+    .mobile-back-button {
+        display: flex !important;
+
+        align-items: center;
+        justify-content: center;
+
+        width: 36px;
+        height: 36px;
+
+        min-width: 36px;
+
+        border: 0;
+        border-radius: 9px;
+
+        background: #171c25;
+
+        color: white;
+
+        font-size: 20px;
+
+        cursor: pointer;
+
+        flex-shrink: 0;
+
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .mobile-back-button:active {
+        background: #252b36;
+
+        transform: scale(.96);
+    }
+
+    .chat-user {
+        flex: 1;
+
+        min-width: 0;
+
+        gap: 8px;
+    }
+
+    .chat-avatar {
+        width: 37px;
+        height: 37px;
+
+        min-width: 37px;
+    }
+
+    .chat-user-info {
         min-width: 0;
     }
 
-    .chat-header {
-        padding: 0 12px;
+    .chat-user-info strong {
+        max-width: 45vw;
+
+        font-size: 14px;
+
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .chat-user-info span {
+        max-width: 45vw;
+
+        font-size: 10px;
+
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .chat-actions {
+        gap: 1px;
+
+        flex-shrink: 0;
+    }
+
+    .chat-actions button {
+        width: 34px;
+        height: 34px;
     }
 
     .chat-actions button:nth-child(2),
@@ -1959,149 +2381,244 @@ body.light-mode {
         display: none;
     }
 
+    /* =====================================================
+       MESSAGES
+    ===================================================== */
+
     .messages {
+        flex: 1;
+
+        min-height: 0;
+
+        width: 100%;
+
+        overflow-y: auto;
+        overflow-x: hidden;
+
         padding:
-            12px
-            9px
-            8px;
+            10px
+            8px
+            6px;
+
+        -webkit-overflow-scrolling: touch;
+
+        overscroll-behavior: contain;
+    }
+
+    .message-row {
+        width: 100%;
+
+        gap: 6px;
+
+        margin: 1px 0;
     }
 
     .message-content {
-        max-width: 78%;
+        width: auto !important;
+
+        max-width: 82% !important;
+
+        min-width: 0;
+
+        flex:
+            0
+            1
+            auto !important;
     }
 
     .message-avatar {
         width: 28px;
         height: 28px;
+
         min-width: 28px;
+
+        font-size: 10px;
     }
 
     .message-bubble {
-        font-size: 14px;
+        max-width: 100% !important;
 
         padding:
             7px
-            10px;
+            10px !important;
+
+        font-size: 14px;
+
+        line-height: 1.4;
+
+        border-radius: 15px !important;
     }
 
+    /* =====================================================
+       IMAGES
+    ===================================================== */
+
     .message-image-wrap {
-        max-width: 250px;
+        width: fit-content;
+
+        max-width: 72vw;
+
+        border-radius: 14px;
     }
 
     .message-image {
-        max-width: 250px;
-        max-height: 350px;
+        width: auto;
+
+        max-width: 72vw;
+
+        max-height: 45vh;
+
+        border-radius: 14px;
     }
 
-    .composer {
+    /* =====================================================
+       TYPING
+    ===================================================== */
+
+    .typing {
+        min-height: 18px;
+
         padding:
-            8px
-            8px
+            0
             10px;
+
+        font-size: 10px;
+    }
+
+    /* =====================================================
+       REPLY
+    ===================================================== */
+
+    .reply-bar {
+        width: auto;
+
+        min-height: 48px;
+
+        margin:
+            0
+            8px;
+
+        padding:
+            7px
+            9px;
+
+        border-radius:
+            9px
+            9px
+            0
+            0;
+    }
+
+    /* =====================================================
+       COMPOSER
+    ===================================================== */
+
+    .composer {
+        width: 100%;
+
+        min-height: 62px;
+
+        padding:
+            7px
+            7px
+            calc(
+                7px +
+                env(safe-area-inset-bottom)
+            );
+
+        gap: 6px;
     }
 
     #messageInput {
+        flex: 1;
+
+        width: 100%;
+        min-width: 0;
+
         height: 42px;
+
+        padding:
+            0
+            11px;
+
+        border-radius: 11px;
+
+        font-size: 16px;
     }
 
     .composer-button,
     .send-button {
         width: 40px;
-        min-width: 40px;
         height: 40px;
+
+        min-width: 40px;
+
+        border-radius: 10px;
     }
+
+    /* =====================================================
+       PROFILE
+    ===================================================== */
+
+    .profile-panel {
+        display: none !important;
+    }
+
+    /* =====================================================
+       MODAL
+    ===================================================== */
+
+    .modal {
+        padding: 12px;
+
+        align-items: center;
+
+        overflow-y: auto;
+    }
+
+    .modal-box {
+        width: 100%;
+
+        max-width: 430px;
+
+        max-height: 90dvh;
+
+        padding: 17px;
+
+        border-radius: 14px;
+
+        overflow-y: auto;
+    }
+
+    /* =====================================================
+       SETTINGS
+    ===================================================== */
 
     .settings-box {
         width: 96vw;
-        height: 90vh;
-    }
 
-    .settings-sidebar {
-        width: 145px;
-    }
+        height: 92dvh;
 
-    .settings-content {
-        padding: 35px 20px;
-    }
+        max-height: 92dvh;
 
-    .setting-item {
-        align-items: flex-start;
         flex-direction: column;
-    }
-}
 
-/* =========================================================
-   SMALL PHONE
-========================================================= */
-
-@media (max-width: 560px) {
-
-    .app {
-        grid-template-columns:
-            0
-            0
-            minmax(0, 1fr)
-            0;
-    }
-
-    .dm-sidebar {
-        display: none;
-    }
-
-    .chat {
-        width: 100%;
-    }
-
-    .chat-header {
-        height: 58px;
-        min-height: 58px;
-    }
-
-    .chat-avatar {
-        width: 36px;
-        height: 36px;
-        min-width: 36px;
-    }
-
-    .messages {
-        padding:
-            10px
-            7px
-            6px;
-    }
-
-    .message-content {
-        max-width: 82%;
-    }
-
-    .message-bubble {
-        padding:
-            7px
-            10px;
-    }
-
-    .message-image-wrap,
-    .message-image {
-        max-width: 230px;
-    }
-
-    .message-image {
-        max-height: 320px;
-    }
-
-    .settings-box {
-        flex-direction: column;
+        border-radius: 14px;
     }
 
     .settings-sidebar {
         width: 100%;
         height: auto;
 
+        flex-shrink: 0;
+
         flex-direction: row;
 
         overflow-x: auto;
 
-        padding: 10px;
+        padding: 9px;
+
+        gap: 5px;
     }
 
     .settings-sidebar h3 {
@@ -2115,6 +2632,12 @@ body.light-mode {
         min-width: max-content;
 
         height: 38px;
+
+        padding:
+            0
+            11px;
+
+        white-space: nowrap;
     }
 
     .logout-button {
@@ -2122,7 +2645,24 @@ body.light-mode {
     }
 
     .settings-content {
-        padding: 45px 16px 20px;
+        width: 100%;
+
+        min-height: 0;
+
+        padding:
+            42px
+            15px
+            20px;
+
+        overflow-y: auto;
+    }
+
+    .setting-item {
+        align-items: flex-start;
+
+        flex-direction: column;
+
+        gap: 12px;
     }
 
     .username-change {
@@ -2131,7 +2671,191 @@ body.light-mode {
 
     .username-change input {
         flex: 1;
+
         width: auto;
+
+        min-width: 0;
+    }
+}
+
+/* =========================================================
+   SMALL PHONE
+========================================================= */
+
+@media (max-width: 430px) {
+
+    .dm-header {
+        padding: 0 10px;
+    }
+
+    .friend-search-wrap {
+        padding:
+            8px
+            9px;
+    }
+
+    .dm-user {
+        min-height: 56px;
+    }
+
+    .dm-avatar {
+        width: 42px;
+        height: 42px;
+
+        min-width: 42px;
+    }
+
+    .messages {
+        padding:
+            8px
+            6px
+            5px;
+    }
+
+    .message-content {
+        max-width: 84% !important;
+    }
+
+    .message-bubble {
+        font-size: 13.5px;
+
+        padding:
+            7px
+            9px !important;
+    }
+
+    .message-image-wrap,
+    .message-image {
+        max-width: 68vw;
+    }
+
+    .composer {
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+
+    .composer-button,
+    .send-button {
+        width: 38px;
+        height: 38px;
+
+        min-width: 38px;
+    }
+
+    #messageInput {
+        height: 40px;
+
+        font-size: 16px;
+    }
+
+    .chat-header {
+        padding:
+            0
+            7px;
+    }
+
+    .chat-avatar {
+        width: 35px;
+        height: 35px;
+
+        min-width: 35px;
+    }
+
+    .chat-user-info strong {
+        font-size: 13px;
+    }
+
+    .chat-user-info span {
+        font-size: 10px;
+    }
+}
+
+/* =========================================================
+   VERY SMALL PHONE
+========================================================= */
+
+@media (max-width: 360px) {
+
+    .mobile-back-button {
+        width: 33px;
+        height: 33px;
+
+        min-width: 33px;
+
+        font-size: 18px;
+    }
+
+    .chat-avatar {
+        width: 33px;
+        height: 33px;
+
+        min-width: 33px;
+    }
+
+    .chat-user-info strong {
+        max-width: 35vw;
+
+        font-size: 12px;
+    }
+
+    .chat-user-info span {
+        max-width: 35vw;
+    }
+
+    .composer-button,
+    .send-button {
+        width: 36px;
+        height: 36px;
+
+        min-width: 36px;
+    }
+
+    #messageInput {
+        height: 38px;
+
+        padding-left: 9px;
+        padding-right: 9px;
+    }
+}
+
+/* =========================================================
+   LANDSCAPE PHONE
+========================================================= */
+
+@media (max-width: 900px) and (orientation: landscape) {
+
+    .chat-header {
+        height: 52px;
+
+        min-height: 52px;
+    }
+
+    .messages {
+        padding-top: 6px;
+    }
+
+    .composer {
+        min-height: 54px;
+
+        padding:
+            5px
+            7px
+            calc(
+                5px +
+                env(safe-area-inset-bottom)
+            );
+    }
+
+    #messageInput {
+        height: 38px;
+    }
+
+    .composer-button,
+    .send-button {
+        width: 36px;
+        height: 36px;
+
+        min-width: 36px;
     }
 }
 
@@ -2170,6 +2894,28 @@ body.light-mode {
 }
 
 /* =========================================================
+   GENERIC AVATAR
+========================================================= */
+
+.avatar-image {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+
+    display: block;
+}
+
+.avatar-letter {
+    width: 100%;
+    height: 100%;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* =========================================================
    SELECTION
 ========================================================= */
 
@@ -2186,28 +2932,44 @@ body.light-mode {
 .hidden {
     display: none !important;
 }
-/* FIX KHUNG TIN NHẮN */
-.message-row .message-content {
-    width: auto !important;
-    max-width: min(65%, 540px) !important;
-    flex: 0 1 auto !important;
+
+/* =========================================================
+   TOUCH
+========================================================= */
+
+@media (hover: none) and (pointer: coarse) {
+
+    button {
+        touch-action: manipulation;
+    }
+
+    .dm-user:hover {
+        background: transparent;
+    }
+
+    .dm-user:active {
+        background: #202631;
+    }
+
+    .server-icon:hover,
+    .composer-button:hover,
+    .send-button:hover {
+        transform: none;
+    }
 }
 
-.message-row .message-bubble {
-    width: fit-content !important;
-    max-width: 100% !important;
-    display: inline-block !important;
+/* =========================================================
+   PC — MOBILE BACK HIDDEN
+========================================================= */
 
-    padding: 7px 11px !important;
-    border-radius: 16px !important;
+@media (min-width: 761px) {
 
-    line-height: 1.35 !important;
-}
+    .mobile-back-button {
+        display: none !important;
+    }
 
-.message-row.mine .message-content {
-    align-items: flex-end !important;
-}
-
-.message-row.theirs .message-content {
-    align-items: flex-start !important;
+    .dm-sidebar,
+    .chat {
+        transform: none !important;
+    }
 }
