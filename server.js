@@ -4,14 +4,71 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
-const fs = require("fs");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
+const { Pool } = require("pg");
 
 const app = express();
 const server = http.createServer(app);
+
+/* =========================================================
+   CONFIG
+========================================================= */
+
+const PORT = Number(process.env.PORT) || 10000;
+
+const JWT_SECRET =
+    process.env.JWT_SECRET ||
+    "M4_CHAT_CHANGE_THIS_SECRET_2026";
+
+const PUBLIC_DIR = path.join(__dirname, "public");
+
+const DATABASE_URL =
+    process.env.DATABASE_URL || "";
+
+if (!DATABASE_URL) {
+    console.error("");
+    console.error("======================================");
+    console.error("DATABASE_URL NOT FOUND");
+    console.error("======================================");
+    console.error(
+        "Hãy thêm DATABASE_URL vào Environment của Render."
+    );
+    console.error("");
+}
+
+/* =========================================================
+   POSTGRESQL
+========================================================= */
+
+const pool = new Pool({
+    connectionString: DATABASE_URL,
+
+    ssl: DATABASE_URL
+        ? {
+            rejectUnauthorized: false
+        }
+        : false,
+
+    max: 10,
+
+    idleTimeoutMillis: 30000,
+
+    connectionTimeoutMillis: 10000
+});
+
+pool.on("error", (error) => {
+    console.error(
+        "[POSTGRES] Unexpected pool error:",
+        error
+    );
+});
+
+/* =========================================================
+   SOCKET.IO
+========================================================= */
 
 const io = new Server(server, {
     cors: {
@@ -19,135 +76,32 @@ const io = new Server(server, {
         credentials: true,
         methods: ["GET", "POST"]
     },
+
     maxHttpBufferSize: 12 * 1024 * 1024
 });
 
-const PORT = process.env.PORT || 10000;
-
-const JWT_SECRET =
-    process.env.JWT_SECRET ||
-    "M4_CHAT_CHANGE_THIS_SECRET_2026";
-
-const PUBLIC_DIR = path.join(__dirname, "public");
-const DATA_DIR = path.join(__dirname, "data");
-const DATA_FILE = path.join(DATA_DIR, "data.json");
-
-app.use(express.json({ limit: "12mb" }));
-app.use(express.urlencoded({
-    extended: true,
-    limit: "12mb"
-}));
-app.use(cookieParser());
-app.use(express.static(PUBLIC_DIR));
-
 /* =========================================================
-   DATABASE
+   EXPRESS
 ========================================================= */
 
-let database = {
-    users: {},
-    messages: {},
-    friendRequests: [],
-    friendships: []
-};
+app.use(
+    express.json({
+        limit: "12mb"
+    })
+);
 
-let saveTimer = null;
+app.use(
+    express.urlencoded({
+        extended: true,
+        limit: "12mb"
+    })
+);
 
-function ensureDataDirectory() {
-    if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, {
-            recursive: true
-        });
-    }
-}
+app.use(cookieParser());
 
-function saveDatabase() {
-    ensureDataDirectory();
-
-    try {
-        const temp = DATA_FILE + ".tmp";
-
-        fs.writeFileSync(
-            temp,
-            JSON.stringify(database, null, 2),
-            "utf8"
-        );
-
-        fs.renameSync(temp, DATA_FILE);
-    } catch (error) {
-        console.error("[DATA] Save error:", error);
-    }
-}
-
-function scheduleSave() {
-    clearTimeout(saveTimer);
-
-    saveTimer = setTimeout(() => {
-        saveDatabase();
-    }, 500);
-}
-
-function loadDatabase() {
-    ensureDataDirectory();
-
-    if (!fs.existsSync(DATA_FILE)) {
-        saveDatabase();
-        return;
-    }
-
-    try {
-        const raw = fs.readFileSync(
-            DATA_FILE,
-            "utf8"
-        );
-
-        if (!raw.trim()) {
-            return;
-        }
-
-        const parsed = JSON.parse(raw);
-
-        database = {
-            users:
-                parsed.users &&
-                typeof parsed.users === "object"
-                    ? parsed.users
-                    : {},
-
-            messages:
-                parsed.messages &&
-                typeof parsed.messages === "object"
-                    ? parsed.messages
-                    : {},
-
-            friendRequests:
-                Array.isArray(parsed.friendRequests)
-                    ? parsed.friendRequests
-                    : [],
-
-            friendships:
-                Array.isArray(parsed.friendships)
-                    ? parsed.friendships
-                    : []
-        };
-
-        console.log(
-            `[DATA] Loaded ${Object.keys(database.users).length} users`
-        );
-
-    } catch (error) {
-        console.error("[DATA] Load error:", error);
-
-        database = {
-            users: {},
-            messages: {},
-            friendRequests: [],
-            friendships: []
-        };
-    }
-}
-
-loadDatabase();
+app.use(
+    express.static(PUBLIC_DIR)
+);
 
 /* =========================================================
    HELPERS
@@ -184,39 +138,199 @@ function validUsername(value) {
     return /^[A-Za-z0-9_]{3,20}$/.test(value);
 }
 
-function getUser(username) {
-    const key = normalizeUsername(username);
+/* =========================================================
+   DATABASE INIT
+========================================================= */
 
-    return database.users[key] || null;
+async function initDatabase() {
+
+    console.log("[POSTGRES] Initializing database...");
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+            username_key VARCHAR(30) PRIMARY KEY,
+            username VARCHAR(30) NOT NULL,
+            password_hash TEXT NOT NULL,
+            avatar TEXT DEFAULT '',
+            created_at BIGINT NOT NULL,
+            last_login BIGINT DEFAULT NULL
+        )
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS messages (
+            id VARCHAR(150) PRIMARY KEY,
+            conversation_key VARCHAR(100) NOT NULL,
+            sender_key VARCHAR(30) NOT NULL,
+            sender_username VARCHAR(30) NOT NULL,
+            sender_avatar TEXT DEFAULT '',
+            receiver_key VARCHAR(30) NOT NULL,
+            text TEXT DEFAULT '',
+            image TEXT DEFAULT '',
+            message_time BIGINT NOT NULL,
+            reply_username VARCHAR(30) DEFAULT '',
+            reply_text TEXT DEFAULT ''
+        )
+    `);
+
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_messages_conversation
+        ON messages(conversation_key, message_time)
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS friend_requests (
+            id VARCHAR(150) PRIMARY KEY,
+            from_key VARCHAR(30) NOT NULL,
+            to_key VARCHAR(30) NOT NULL,
+            from_username VARCHAR(30) NOT NULL,
+            to_username VARCHAR(30) NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            created_at BIGINT NOT NULL
+        )
+    `);
+
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_friend_requests_to
+        ON friend_requests(to_key, status)
+    `);
+
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_friend_requests_from
+        ON friend_requests(from_key, status)
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS friendships (
+            id VARCHAR(150) PRIMARY KEY,
+            user_a VARCHAR(30) NOT NULL,
+            user_b VARCHAR(30) NOT NULL,
+            created_at BIGINT NOT NULL
+        )
+    `);
+
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_friendships_a
+        ON friendships(user_a)
+    `);
+
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_friendships_b
+        ON friendships(user_b)
+    `);
+
+    console.log("[POSTGRES] Database ready.");
 }
 
 /* =========================================================
-   USER
+   USER DATABASE
 ========================================================= */
 
-function createUser(username, password) {
-    const clean = cleanUsername(username);
-    const key = normalizeUsername(clean);
+async function getUser(username) {
 
-    const passwordHash = bcrypt.hashSync(
-        password,
-        12
+    const key =
+        normalizeUsername(username);
+
+    if (!key) {
+        return null;
+    }
+
+    const result = await pool.query(
+        `
+        SELECT
+            username_key,
+            username,
+            password_hash,
+            avatar,
+            created_at,
+            last_login
+        FROM users
+        WHERE username_key = $1
+        LIMIT 1
+        `,
+        [key]
     );
 
-    const user = {
-        username: clean,
-        passwordHash,
-        avatar:
-            clean.charAt(0).toUpperCase(),
-        createdAt: now(),
-        online: false
+    if (!result.rows.length) {
+        return null;
+    }
+
+    const row = result.rows[0];
+
+    return {
+        username: row.username,
+        usernameKey: row.username_key,
+        passwordHash: row.password_hash,
+        avatar: row.avatar || "",
+        createdAt: Number(row.created_at),
+        lastLogin:
+            row.last_login
+                ? Number(row.last_login)
+                : null
     };
+}
 
-    database.users[key] = user;
+async function createUser(
+    username,
+    password
+) {
 
-    scheduleSave();
+    const clean =
+        cleanUsername(username);
 
-    return user;
+    const key =
+        normalizeUsername(clean);
+
+    const passwordHash =
+        await bcrypt.hash(
+            password,
+            12
+        );
+
+    const createdAt =
+        now();
+
+    const avatar =
+        clean.charAt(0).toUpperCase();
+
+    const result = await pool.query(
+        `
+        INSERT INTO users (
+            username_key,
+            username,
+            password_hash,
+            avatar,
+            created_at
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING
+            username_key,
+            username,
+            password_hash,
+            avatar,
+            created_at,
+            last_login
+        `,
+        [
+            key,
+            clean,
+            passwordHash,
+            avatar,
+            createdAt
+        ]
+    );
+
+    const row = result.rows[0];
+
+    return {
+        username: row.username,
+        usernameKey: row.username_key,
+        passwordHash: row.password_hash,
+        avatar: row.avatar,
+        createdAt:
+            Number(row.created_at),
+        lastLogin: null
+    };
 }
 
 /* =========================================================
@@ -224,6 +338,7 @@ function createUser(username, password) {
 ========================================================= */
 
 function createToken(user) {
+
     return jwt.sign(
         {
             username: user.username
@@ -236,6 +351,7 @@ function createToken(user) {
 }
 
 function getTokenFromRequest(req) {
+
     return req.cookies &&
         req.cookies.m4_token
         ? req.cookies.m4_token
@@ -243,6 +359,7 @@ function getTokenFromRequest(req) {
 }
 
 function verifyToken(token) {
+
     if (!token) {
         return null;
     }
@@ -257,39 +374,127 @@ function verifyToken(token) {
     }
 }
 
-function getAuthenticatedUser(req) {
+async function getAuthenticatedUser(req) {
+
     const token =
         getTokenFromRequest(req);
 
     const payload =
         verifyToken(token);
 
-    if (!payload || !payload.username) {
+    if (
+        !payload ||
+        !payload.username
+    ) {
         return null;
     }
 
-    return getUser(payload.username);
+    return getUser(
+        payload.username
+    );
 }
 
-function requireAuth(req, res, next) {
-    const user =
-        getAuthenticatedUser(req);
+async function requireAuth(
+    req,
+    res,
+    next
+) {
 
-    if (!user) {
-        return res.status(401).json({
+    try {
+
+        const user =
+            await getAuthenticatedUser(req);
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                ok: false,
+                message:
+                    "Bạn chưa đăng nhập."
+            });
+        }
+
+        req.user = user;
+
+        next();
+
+    } catch (error) {
+
+        console.error(
+            "[AUTH]",
+            error
+        );
+
+        return res.status(500).json({
             success: false,
             ok: false,
-            message: "Bạn chưa đăng nhập."
+            message:
+                "Không thể xác thực tài khoản."
         });
     }
-
-    req.user = user;
-
-    next();
 }
 
 /* =========================================================
-   AUTH API - REGISTER
+   COOKIE
+========================================================= */
+
+function setAuthCookie(
+    res,
+    token
+) {
+
+    res.cookie(
+        "m4_token",
+        token,
+        {
+            httpOnly: true,
+
+            sameSite:
+                process.env.NODE_ENV ===
+                "production"
+                    ? "none"
+                    : "lax",
+
+            secure:
+                process.env.NODE_ENV ===
+                "production",
+
+            maxAge:
+                30 *
+                24 *
+                60 *
+                60 *
+                1000,
+
+            path: "/"
+        }
+    );
+}
+
+function clearAuthCookie(res) {
+
+    res.clearCookie(
+        "m4_token",
+        {
+            httpOnly: true,
+
+            sameSite:
+                process.env.NODE_ENV ===
+                "production"
+                    ? "none"
+                    : "lax",
+
+            secure:
+                process.env.NODE_ENV ===
+                "production",
+
+            path: "/"
+        }
+    );
+}
+
+/* =========================================================
+   REGISTER
 ========================================================= */
 
 app.post(
@@ -305,26 +510,32 @@ app.post(
                 );
 
             const password =
-                typeof req.body?.password === "string"
+                typeof req.body?.password ===
+                "string"
                     ? req.body.password
                     : "";
 
             const confirmPassword =
-                typeof req.body?.confirmPassword === "string"
+                typeof req.body?.confirmPassword ===
+                "string"
                     ? req.body.confirmPassword
                     : "";
 
             if (!validUsername(username)) {
+
                 return res.status(400).json({
                     success: false,
+                    ok: false,
                     message:
                         "Username chỉ được dùng chữ, số và dấu _, từ 3 đến 20 ký tự."
                 });
             }
 
             if (password.length < 6) {
+
                 return res.status(400).json({
                     success: false,
+                    ok: false,
                     message:
                         "Mật khẩu phải có ít nhất 6 ký tự."
                 });
@@ -334,23 +545,30 @@ app.post(
                 confirmPassword &&
                 password !== confirmPassword
             ) {
+
                 return res.status(400).json({
                     success: false,
+                    ok: false,
                     message:
                         "Mật khẩu xác nhận không khớp."
                 });
             }
 
-            if (getUser(username)) {
+            const existing =
+                await getUser(username);
+
+            if (existing) {
+
                 return res.status(409).json({
                     success: false,
+                    ok: false,
                     message:
                         "Username đã tồn tại."
                 });
             }
 
             const user =
-                createUser(
+                await createUser(
                     username,
                     password
                 );
@@ -358,31 +576,25 @@ app.post(
             const token =
                 createToken(user);
 
-            res.cookie(
-                "m4_token",
-                token,
-                {
-                    httpOnly: true,
-                    sameSite: "lax",
-                    secure:
-                        process.env.NODE_ENV ===
-                        "production",
-                    maxAge:
-                        30 * 24 * 60 * 60 * 1000,
-                    path: "/"
-                }
+            setAuthCookie(
+                res,
+                token
             );
 
             return res.json({
                 success: true,
                 ok: true,
+
                 message:
                     "Tạo tài khoản thành công.",
+
                 user: {
                     username:
                         user.username,
+
                     avatar:
                         user.avatar,
+
                     online: false
                 }
             });
@@ -394,8 +606,21 @@ app.post(
                 error
             );
 
+            if (
+                error.code ===
+                "23505"
+            ) {
+                return res.status(409).json({
+                    success: false,
+                    ok: false,
+                    message:
+                        "Username đã tồn tại."
+                });
+            }
+
             return res.status(500).json({
                 success: false,
+                ok: false,
                 message:
                     "Không thể tạo tài khoản."
             });
@@ -404,7 +629,7 @@ app.post(
 );
 
 /* =========================================================
-   AUTH API - LOGIN
+   LOGIN
 ========================================================= */
 
 app.post(
@@ -420,24 +645,32 @@ app.post(
                 );
 
             const password =
-                typeof req.body?.password === "string"
+                typeof req.body?.password ===
+                "string"
                     ? req.body.password
                     : "";
 
-            if (!username || !password) {
+            if (
+                !username ||
+                !password
+            ) {
+
                 return res.status(400).json({
                     success: false,
+                    ok: false,
                     message:
                         "Vui lòng nhập username và mật khẩu."
                 });
             }
 
             const user =
-                getUser(username);
+                await getUser(username);
 
             if (!user) {
+
                 return res.status(401).json({
                     success: false,
+                    ok: false,
                     message:
                         "Username hoặc mật khẩu không đúng."
                 });
@@ -446,50 +679,59 @@ app.post(
             const valid =
                 await bcrypt.compare(
                     password,
-                    user.passwordHash || ""
+                    user.passwordHash
                 );
 
             if (!valid) {
+
                 return res.status(401).json({
                     success: false,
+                    ok: false,
                     message:
                         "Username hoặc mật khẩu không đúng."
                 });
             }
 
-            const token =
-                createToken(user);
+            const loginTime =
+                now();
 
-            res.cookie(
-                "m4_token",
-                token,
-                {
-                    httpOnly: true,
-                    sameSite: "lax",
-                    secure:
-                        process.env.NODE_ENV ===
-                        "production",
-                    maxAge:
-                        30 * 24 * 60 * 60 * 1000,
-                    path: "/"
-                }
+            await pool.query(
+                `
+                UPDATE users
+                SET last_login = $1
+                WHERE username_key = $2
+                `,
+                [
+                    loginTime,
+                    user.usernameKey
+                ]
             );
 
             user.lastLogin =
-                now();
+                loginTime;
 
-            scheduleSave();
+            const token =
+                createToken(user);
+
+            setAuthCookie(
+                res,
+                token
+            );
 
             return res.json({
                 success: true,
                 ok: true,
+
                 message:
                     "Đăng nhập thành công.",
+
                 user: {
                     username:
                         user.username,
+
                     avatar:
                         user.avatar,
+
                     online:
                         isUserOnline(
                             user.username
@@ -506,6 +748,7 @@ app.post(
 
             return res.status(500).json({
                 success: false,
+                ok: false,
                 message:
                     "Không thể đăng nhập."
             });
@@ -514,30 +757,34 @@ app.post(
 );
 
 /* =========================================================
-   AUTH API - ME
+   ME
 ========================================================= */
 
 app.get(
     "/api/me",
     requireAuth,
-    (req, res) => {
+    async (req, res) => {
 
         const user =
             req.user;
 
-        res.json({
+        return res.json({
             success: true,
             ok: true,
             authenticated: true,
+
             user: {
                 username:
                     user.username,
+
                 avatar:
                     user.avatar,
+
                 online:
                     isUserOnline(
                         user.username
                     ),
+
                 createdAt:
                     user.createdAt
             }
@@ -546,26 +793,16 @@ app.get(
 );
 
 /* =========================================================
-   AUTH API - LOGOUT
+   LOGOUT
 ========================================================= */
 
 app.post(
     "/api/logout",
     (req, res) => {
 
-        res.clearCookie(
-            "m4_token",
-            {
-                httpOnly: true,
-                sameSite: "lax",
-                secure:
-                    process.env.NODE_ENV ===
-                    "production",
-                path: "/"
-            }
-        );
+        clearAuthCookie(res);
 
-        res.json({
+        return res.json({
             success: true,
             ok: true
         });
@@ -578,36 +815,82 @@ app.post(
 
 app.get(
     "/api/health",
-    (req, res) => {
+    async (req, res) => {
 
-        res.json({
-            ok: true,
-            success: true,
-            name: "M4 Chat",
-            status: "online",
-            users:
-                Object.keys(
-                    database.users
-                ).length,
-            conversations:
-                Object.keys(
-                    database.messages
-                ).length,
-            time: now()
-        });
+        try {
+
+            const db =
+                await pool.query(
+                    "SELECT NOW() AS time"
+                );
+
+            const users =
+                await pool.query(
+                    "SELECT COUNT(*)::int AS count FROM users"
+                );
+
+            const messages =
+                await pool.query(
+                    "SELECT COUNT(*)::int AS count FROM messages"
+                );
+
+            return res.json({
+                success: true,
+                ok: true,
+
+                name:
+                    "M4 Chat",
+
+                status:
+                    "online",
+
+                database:
+                    "connected",
+
+                users:
+                    users.rows[0].count,
+
+                messages:
+                    messages.rows[0].count,
+
+                time:
+                    now(),
+
+                postgresTime:
+                    db.rows[0].time
+            });
+
+        } catch (error) {
+
+            console.error(
+                "[HEALTH]",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                ok: false,
+                status:
+                    "database_error",
+                database:
+                    "disconnected"
+            });
+        }
     }
 );
 
 /* =========================================================
-   ONLINE USERS
+   ONLINE SYSTEM
 ========================================================= */
 
-const onlineUsers = new Map();
+const onlineUsers =
+    new Map();
 
 function addOnlineUser(
     username,
     socketId
 ) {
+
     const key =
         normalizeUsername(username);
 
@@ -615,7 +898,9 @@ function addOnlineUser(
         return;
     }
 
-    if (!onlineUsers.has(key)) {
+    if (
+        !onlineUsers.has(key)
+    ) {
         onlineUsers.set(
             key,
             new Set()
@@ -626,21 +911,10 @@ function addOnlineUser(
         .get(key)
         .add(socketId);
 
-    const user =
-        getUser(username);
-
-    if (user) {
-        user.online = true;
-        scheduleSave();
-    }
-
     io.emit(
         "user_status",
         {
-            username:
-                user
-                    ? user.username
-                    : username,
+            username,
             online: true
         }
     );
@@ -650,6 +924,7 @@ function removeOnlineUser(
     username,
     socketId
 ) {
+
     const key =
         normalizeUsername(username);
 
@@ -662,35 +937,31 @@ function removeOnlineUser(
 
     sockets.delete(socketId);
 
-    if (sockets.size === 0) {
+    if (
+        sockets.size === 0
+    ) {
 
         onlineUsers.delete(key);
-
-        const user =
-            getUser(username);
-
-        if (user) {
-            user.online = false;
-            scheduleSave();
-        }
 
         io.emit(
             "user_status",
             {
-                username:
-                    user
-                        ? user.username
-                        : username,
+                username,
                 online: false
             }
         );
     }
 }
 
-function isUserOnline(username) {
+function isUserOnline(
+    username
+) {
+
     const sockets =
         onlineUsers.get(
-            normalizeUsername(username)
+            normalizeUsername(
+                username
+            )
         );
 
     return !!(
@@ -704,9 +975,12 @@ function sendToUser(
     event,
     data
 ) {
+
     const sockets =
         onlineUsers.get(
-            normalizeUsername(username)
+            normalizeUsername(
+                username
+            )
         );
 
     if (!sockets) {
@@ -714,6 +988,7 @@ function sendToUser(
     }
 
     for (const id of sockets) {
+
         io.to(id).emit(
             event,
             data
@@ -729,48 +1004,71 @@ function sendToUser(
 
 app.get(
     "/api/user/:username",
-    (req, res) => {
+    async (req, res) => {
 
-        const username =
-            cleanUsername(
-                req.params.username
+        try {
+
+            const username =
+                cleanUsername(
+                    req.params.username
+                );
+
+            const user =
+                await getUser(
+                    username
+                );
+
+            if (!user) {
+
+                return res.status(404).json({
+                    ok: false,
+                    message:
+                        "Không tìm thấy người dùng."
+                });
+            }
+
+            return res.json({
+                ok: true,
+
+                user: {
+                    username:
+                        user.username,
+
+                    avatar:
+                        user.avatar,
+
+                    online:
+                        isUserOnline(
+                            user.username
+                        )
+                }
+            });
+
+        } catch (error) {
+
+            console.error(
+                "[USER]",
+                error
             );
 
-        const user =
-            getUser(username);
-
-        if (!user) {
-            return res.status(404).json({
+            return res.status(500).json({
                 ok: false,
                 message:
-                    "Không tìm thấy người dùng."
+                    "Không thể lấy thông tin người dùng."
             });
         }
-
-        res.json({
-            ok: true,
-            user: {
-                username:
-                    user.username,
-                avatar:
-                    user.avatar,
-                online:
-                    isUserOnline(
-                        user.username
-                    )
-            }
-        });
     }
 );
 
 /* =========================================================
-   CONVERSATIONS
+   CONVERSATION
 ========================================================= */
 
 function conversationKey(
     userA,
     userB
 ) {
+
     const a =
         normalizeUsername(userA);
 
@@ -786,10 +1084,11 @@ function conversationKey(
         .join("::");
 }
 
-function getConversation(
+async function getConversation(
     userA,
     userB
 ) {
+
     const key =
         conversationKey(
             userA,
@@ -800,115 +1099,238 @@ function getConversation(
         return [];
     }
 
-    if (
-        !Array.isArray(
-            database.messages[key]
-        )
-    ) {
-        database.messages[key] = [];
-    }
+    const result =
+        await pool.query(
+            `
+            SELECT
+                id,
+                sender_username AS username,
+                sender_avatar AS avatar,
+                receiver_key,
+                text,
+                image,
+                message_time AS time,
+                reply_username,
+                reply_text
+            FROM messages
+            WHERE conversation_key = $1
+            ORDER BY message_time ASC
+            LIMIT 5000
+            `,
+            [key]
+        );
 
-    return database.messages[key];
+    return result.rows.map(
+        row => ({
+            id:
+                row.id,
+
+            username:
+                row.username,
+
+            avatar:
+                row.avatar || "",
+
+            text:
+                row.text || "",
+
+            image:
+                row.image || "",
+
+            time:
+                Number(row.time),
+
+            reply:
+                row.reply_username ||
+                row.reply_text
+                    ? {
+                        username:
+                            row.reply_username ||
+                            "",
+
+                        text:
+                            row.reply_text ||
+                            ""
+                    }
+                    : null
+        })
+    );
 }
 
-function storeMessage(
-    userA,
-    userB,
+async function storeMessage(
+    from,
+    to,
     message
 ) {
+
     const conversation =
-        getConversation(
-            userA,
-            userB
+        conversationKey(
+            from,
+            to
         );
 
-    if (
-        conversation.some(
-            item =>
-                item &&
-                item.id === message.id
+    const sender =
+        await getUser(from);
+
+    await pool.query(
+        `
+        INSERT INTO messages (
+            id,
+            conversation_key,
+            sender_key,
+            sender_username,
+            sender_avatar,
+            receiver_key,
+            text,
+            image,
+            message_time,
+            reply_username,
+            reply_text
         )
-    ) {
-        return message;
-    }
+        VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7,
+            $8,
+            $9,
+            $10,
+            $11
+        )
+        ON CONFLICT (id) DO NOTHING
+        `,
+        [
+            message.id,
 
-    conversation.push(message);
+            conversation,
 
-    if (conversation.length > 5000) {
-        conversation.splice(
-            0,
-            conversation.length - 5000
-        );
-    }
+            normalizeUsername(
+                from
+            ),
 
-    scheduleSave();
+            sender
+                ? sender.username
+                : from,
+
+            sender
+                ? sender.avatar
+                : "",
+
+            normalizeUsername(
+                to
+            ),
+
+            message.text || "",
+
+            message.image || "",
+
+            message.time,
+
+            message.reply?.username ||
+                "",
+
+            message.reply?.text ||
+                ""
+        ]
+    );
 
     return message;
 }
 
+/* =========================================================
+   GET MESSAGES
+========================================================= */
+
 app.get(
     "/api/messages",
     requireAuth,
-    (req, res) => {
+    async (req, res) => {
 
-        const user =
-            req.user.username;
+        try {
 
-        const withUser =
-            cleanUsername(
-                req.query.with
+            const user =
+                req.user.username;
+
+            const withUser =
+                cleanUsername(
+                    req.query.with
+                );
+
+            if (!withUser) {
+
+                return res.status(400).json({
+                    ok: false,
+                    message:
+                        "Thiếu người chat."
+                });
+            }
+
+            return res.json({
+                ok: true,
+
+                messages:
+                    await getConversation(
+                        user,
+                        withUser
+                    )
+            });
+
+        } catch (error) {
+
+            console.error(
+                "[MESSAGES]",
+                error
             );
 
-        if (!withUser) {
-            return res.status(400).json({
+            return res.status(500).json({
                 ok: false,
                 message:
-                    "Thiếu người chat."
+                    "Không thể tải tin nhắn."
             });
         }
-
-        res.json({
-            ok: true,
-            messages:
-                getConversation(
-                    user,
-                    withUser
-                )
-        });
     }
 );
 
 /* =========================================================
-   FRIEND SYSTEM
+   FRIENDS
 ========================================================= */
 
-function hasFriend(
+async function hasFriend(
     userA,
     userB
 ) {
+
     const a =
         normalizeUsername(userA);
 
     const b =
         normalizeUsername(userB);
 
-    return database.friendships.some(
-        f =>
-            (
-                f.a === a &&
-                f.b === b
-            ) ||
-            (
-                f.a === b &&
-                f.b === a
-            )
-    );
+    const result =
+        await pool.query(
+            `
+            SELECT 1
+            FROM friendships
+            WHERE
+                (user_a = $1 AND user_b = $2)
+                OR
+                (user_a = $2 AND user_b = $1)
+            LIMIT 1
+            `,
+            [a, b]
+        );
+
+    return result.rows.length > 0;
 }
 
-function addFriendship(
+async function addFriendship(
     userA,
     userB
 ) {
+
     const a =
         normalizeUsername(userA);
 
@@ -923,143 +1345,303 @@ function addFriendship(
         return false;
     }
 
-    if (hasFriend(a, b)) {
+    if (
+        await hasFriend(a, b)
+    ) {
         return true;
     }
 
-    database.friendships.push({
-        id: createID(),
-        a,
-        b,
-        createdAt: now()
-    });
-
-    scheduleSave();
+    await pool.query(
+        `
+        INSERT INTO friendships (
+            id,
+            user_a,
+            user_b,
+            created_at
+        )
+        VALUES ($1, $2, $3, $4)
+        `,
+        [
+            createID(),
+            a,
+            b,
+            now()
+        ]
+    );
 
     return true;
 }
 
-function hasPendingRequest(
+async function hasPendingRequest(
     from,
     to
 ) {
+
     const a =
         normalizeUsername(from);
 
     const b =
         normalizeUsername(to);
 
-    return database.friendRequests.some(
-        r =>
-            r.status === "pending" &&
-            r.from === a &&
-            r.to === b
-    );
+    const result =
+        await pool.query(
+            `
+            SELECT 1
+            FROM friend_requests
+            WHERE
+                from_key = $1
+                AND to_key = $2
+                AND status = 'pending'
+            LIMIT 1
+            `,
+            [a, b]
+        );
+
+    return result.rows.length > 0;
 }
+
+/* =========================================================
+   FRIEND LIST
+========================================================= */
 
 app.get(
     "/api/friends/:username",
     requireAuth,
-    (req, res) => {
+    async (req, res) => {
 
-        const username =
-            normalizeUsername(
-                req.params.username
-            );
+        try {
 
-        if (
-            username !==
-            normalizeUsername(
-                req.user.username
-            )
-        ) {
-            return res.status(403).json({
-                ok: false,
-                message:
-                    "Không được xem danh sách bạn của tài khoản khác."
-            });
-        }
+            const username =
+                normalizeUsername(
+                    req.params.username
+                );
 
-        const friends =
-            database.friendships
-                .filter(
-                    f =>
-                        f.a === username ||
-                        f.b === username
+            if (
+                username !==
+                normalizeUsername(
+                    req.user.username
                 )
-                .map(
-                    f =>
-                        f.a === username
-                            ? f.b
-                            : f.a
-                )
-                .map(
-                    key =>
-                        database.users[key]
-                )
-                .filter(Boolean)
-                .map(user => ({
+            ) {
+
+                return res.status(403).json({
+                    ok: false,
+                    message:
+                        "Không được xem danh sách bạn của tài khoản khác."
+                });
+            }
+
+            const result =
+                await pool.query(
+                    `
+                    SELECT
+                        CASE
+                            WHEN f.user_a = $1
+                            THEN f.user_b
+                            ELSE f.user_a
+                        END AS friend_key
+                    FROM friendships f
+                    WHERE
+                        f.user_a = $1
+                        OR f.user_b = $1
+                    ORDER BY f.created_at DESC
+                    `,
+                    [username]
+                );
+
+            const friends = [];
+
+            for (
+                const row of result.rows
+            ) {
+
+                const user =
+                    await getUser(
+                        row.friend_key
+                    );
+
+                if (!user) {
+                    continue;
+                }
+
+                friends.push({
                     username:
                         user.username,
+
                     avatar:
                         user.avatar,
+
                     online:
                         isUserOnline(
                             user.username
                         )
-                }));
+                });
+            }
 
-        res.json({
-            ok: true,
-            friends
-        });
+            return res.json({
+                ok: true,
+                friends
+            });
+
+        } catch (error) {
+
+            console.error(
+                "[FRIENDS]",
+                error
+            );
+
+            return res.status(500).json({
+                ok: false,
+                message:
+                    "Không thể tải danh sách bạn."
+            });
+        }
     }
 );
+
+/* =========================================================
+   FRIEND REQUEST LIST
+========================================================= */
 
 app.get(
     "/api/friend-requests/:username",
     requireAuth,
-    (req, res) => {
+    async (req, res) => {
 
-        const username =
-            normalizeUsername(
-                req.params.username
+        try {
+
+            const username =
+                normalizeUsername(
+                    req.params.username
+                );
+
+            if (
+                username !==
+                normalizeUsername(
+                    req.user.username
+                )
+            ) {
+
+                return res.status(403).json({
+                    ok: false,
+                    message:
+                        "Không hợp lệ."
+                });
+            }
+
+            const incoming =
+                await pool.query(
+                    `
+                    SELECT
+                        id,
+                        from_key AS "from",
+                        to_key AS "to",
+                        from_username AS "fromUsername",
+                        to_username AS "toUsername",
+                        status,
+                        created_at AS "createdAt"
+                    FROM friend_requests
+                    WHERE
+                        to_key = $1
+                        AND status = 'pending'
+                    ORDER BY created_at DESC
+                    `,
+                    [username]
+                );
+
+            const outgoing =
+                await pool.query(
+                    `
+                    SELECT
+                        id,
+                        from_key AS "from",
+                        to_key AS "to",
+                        from_username AS "fromUsername",
+                        to_username AS "toUsername",
+                        status,
+                        created_at AS "createdAt"
+                    FROM friend_requests
+                    WHERE
+                        from_key = $1
+                        AND status = 'pending'
+                    ORDER BY created_at DESC
+                    `,
+                    [username]
+                );
+
+            return res.json({
+                ok: true,
+                incoming:
+                    incoming.rows,
+                outgoing:
+                    outgoing.rows
+            });
+
+        } catch (error) {
+
+            console.error(
+                "[FRIEND REQUESTS]",
+                error
             );
 
-        if (
-            username !==
-            normalizeUsername(
-                req.user.username
-            )
-        ) {
-            return res.status(403).json({
+            return res.status(500).json({
                 ok: false,
                 message:
-                    "Không hợp lệ."
+                    "Không thể tải lời mời kết bạn."
             });
         }
-
-        const incoming =
-            database.friendRequests.filter(
-                r =>
-                    r.to === username &&
-                    r.status === "pending"
-            );
-
-        const outgoing =
-            database.friendRequests.filter(
-                r =>
-                    r.from === username &&
-                    r.status === "pending"
-            );
-
-        res.json({
-            ok: true,
-            incoming,
-            outgoing
-        });
     }
 );
+
+/* =========================================================
+   SOCKET AUTH
+========================================================= */
+
+function getCookieToken(
+    socket
+) {
+
+    const authToken =
+        socket.handshake.auth?.token;
+
+    if (authToken) {
+        return authToken;
+    }
+
+    const cookie =
+        socket.handshake.headers?.cookie ||
+        "";
+
+    const match =
+        cookie.match(
+            /(?:^|;\s*)m4_token=([^;]+)/
+        );
+
+    return match
+        ? decodeURIComponent(match[1])
+        : "";
+}
+
+async function authenticateSocket(
+    socket
+) {
+
+    const token =
+        getCookieToken(socket);
+
+    const payload =
+        verifyToken(token);
+
+    if (
+        !payload ||
+        !payload.username
+    ) {
+        return null;
+    }
+
+    return getUser(
+        payload.username
+    );
+}
 
 /* =========================================================
    SOCKET.IO
@@ -1077,92 +1659,80 @@ io.on(
         let socketUsername = "";
 
         /* ================================================
-           AUTH SOCKET
+           USER ONLINE
         ================================================= */
 
         socket.on(
             "user_online",
-            data => {
+            async () => {
 
-                /*
-                 * QUAN TRỌNG:
-                 * Không tin username client gửi.
-                 *
-                 * Socket sẽ kiểm tra JWT cookie.
-                 */
+                try {
 
-                const token =
-                    socket.handshake.auth?.token ||
-                    socket.handshake.headers
-                        ?.cookie
-                        ?.match(
-                            /(?:^|;\s*)m4_token=([^;]+)/
-                        )?.[1];
+                    const user =
+                        await authenticateSocket(
+                            socket
+                        );
 
-                const payload =
-                    verifyToken(token);
+                    if (!user) {
 
-                if (
-                    !payload ||
-                    !payload.username
-                ) {
-                    socket.emit(
-                        "auth_error",
-                        {
-                            error:
-                                "Bạn chưa đăng nhập."
-                        }
-                    );
+                        socket.emit(
+                            "auth_error",
+                            {
+                                error:
+                                    "Bạn chưa đăng nhập."
+                            }
+                        );
 
-                    return;
-                }
-
-                const user =
-                    getUser(
-                        payload.username
-                    );
-
-                if (!user) {
-                    socket.emit(
-                        "auth_error",
-                        {
-                            error:
-                                "Tài khoản không tồn tại."
-                        }
-                    );
-
-                    return;
-                }
-
-                socketUsername =
-                    user.username;
-
-                socket.join(
-                    "user:" +
-                    normalizeUsername(
-                        user.username
-                    )
-                );
-
-                addOnlineUser(
-                    user.username,
-                    socket.id
-                );
-
-                socket.emit(
-                    "current_user",
-                    {
-                        username:
-                            user.username,
-                        avatar:
-                            user.avatar,
-                        online: true
+                        return;
                     }
-                );
 
-                console.log(
-                    `[ONLINE] ${user.username}`
-                );
+                    socketUsername =
+                        user.username;
+
+                    socket.join(
+                        "user:" +
+                        normalizeUsername(
+                            user.username
+                        )
+                    );
+
+                    addOnlineUser(
+                        user.username,
+                        socket.id
+                    );
+
+                    socket.emit(
+                        "current_user",
+                        {
+                            username:
+                                user.username,
+
+                            avatar:
+                                user.avatar,
+
+                            online: true
+                        }
+                    );
+
+                    console.log(
+                        `[ONLINE] ${user.username}`
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "[SOCKET AUTH]",
+                        error
+                    );
+
+                    socket.emit(
+                        "auth_error",
+                        {
+                            error:
+                                "Lỗi xác thực."
+                        }
+                    );
+                }
             }
         );
 
@@ -1172,45 +1742,59 @@ io.on(
 
         socket.on(
             "get_messages",
-            data => {
+            async data => {
 
-                if (!socketUsername) {
+                try {
+
+                    if (!socketUsername) {
+
+                        socket.emit(
+                            "message_error",
+                            {
+                                error:
+                                    "Bạn chưa đăng nhập."
+                            }
+                        );
+
+                        return;
+                    }
+
+                    const withUser =
+                        cleanUsername(
+                            data &&
+                            (
+                                data.with ||
+                                data.username
+                            )
+                        );
+
+                    if (!withUser) {
+                        return;
+                    }
+
+                    const messages =
+                        await getConversation(
+                            socketUsername,
+                            withUser
+                        );
+
                     socket.emit(
-                        "message_error",
+                        "message_history",
                         {
-                            error:
-                                "Bạn chưa đăng nhập."
+                            username:
+                                withUser,
+
+                            messages
                         }
                     );
 
-                    return;
-                }
+                } catch (error) {
 
-                const withUser =
-                    cleanUsername(
-                        data &&
-                        (
-                            data.with ||
-                            data.username
-                        )
+                    console.error(
+                        "[SOCKET HISTORY]",
+                        error
                     );
-
-                if (!withUser) {
-                    return;
                 }
-
-                socket.emit(
-                    "message_history",
-                    {
-                        username:
-                            withUser,
-                        messages:
-                            getConversation(
-                                socketUsername,
-                                withUser
-                            )
-                    }
-                );
             }
         );
 
@@ -1220,145 +1804,208 @@ io.on(
 
         socket.on(
             "private_message",
-            data => {
+            async data => {
 
-                if (!socketUsername) {
-                    socket.emit(
-                        "message_error",
-                        {
-                            error:
-                                "Bạn chưa đăng nhập."
-                        }
-                    );
+                try {
 
-                    return;
-                }
+                    if (!socketUsername) {
 
-                const from =
-                    socketUsername;
-
-                const to =
-                    cleanUsername(
-                        data?.to
-                    );
-
-                if (!to) {
-                    return;
-                }
-
-                if (
-                    normalizeUsername(from) ===
-                    normalizeUsername(to)
-                ) {
-                    return;
-                }
-
-                const receiver =
-                    getUser(to);
-
-                if (!receiver) {
-                    socket.emit(
-                        "message_error",
-                        {
-                            error:
-                                "Không tìm thấy người nhận."
-                        }
-                    );
-
-                    return;
-                }
-
-                let text =
-                    typeof data.text === "string"
-                        ? data.text.slice(0, 5000)
-                        : "";
-
-                let image =
-                    typeof data.image === "string"
-                        ? data.image
-                        : "";
-
-                if (
-                    image.length >
-                    10 * 1024 * 1024
-                ) {
-                    return;
-                }
-
-                if (!text && !image) {
-                    return;
-                }
-
-                const sender =
-                    getUser(from);
-
-                const message = {
-                    id:
-                        typeof data.id === "string"
-                            ? data.id.slice(0, 100)
-                            : createID(),
-
-                    username:
-                        sender.username,
-
-                    avatar:
-                        sender.avatar,
-
-                    text,
-                    image,
-
-                    time:
-                        Number.isFinite(
-                            Number(data.time)
-                        )
-                            ? Number(data.time)
-                            : now(),
-
-                    reply:
-                        data.reply &&
-                        typeof data.reply === "object"
-                            ? {
-                                username:
-                                    cleanUsername(
-                                        data.reply.username
-                                    ),
-                                text:
-                                    String(
-                                        data.reply.text ||
-                                        ""
-                                    ).slice(0, 1000)
+                        socket.emit(
+                            "message_error",
+                            {
+                                error:
+                                    "Bạn chưa đăng nhập."
                             }
-                            : null
-                };
+                        );
 
-                storeMessage(
-                    from,
-                    receiver.username,
-                    message
-                );
+                        return;
+                    }
 
-                socket.emit(
-                    "message_saved",
-                    {
+                    const from =
+                        socketUsername;
+
+                    const to =
+                        cleanUsername(
+                            data?.to
+                        );
+
+                    if (!to) {
+                        return;
+                    }
+
+                    if (
+                        normalizeUsername(
+                            from
+                        ) ===
+                        normalizeUsername(
+                            to
+                        )
+                    ) {
+                        return;
+                    }
+
+                    const receiver =
+                        await getUser(to);
+
+                    if (!receiver) {
+
+                        socket.emit(
+                            "message_error",
+                            {
+                                error:
+                                    "Không tìm thấy người nhận."
+                            }
+                        );
+
+                        return;
+                    }
+
+                    let text =
+                        typeof data?.text ===
+                        "string"
+                            ? data.text.slice(
+                                0,
+                                5000
+                            )
+                            : "";
+
+                    let image =
+                        typeof data?.image ===
+                        "string"
+                            ? data.image
+                            : "";
+
+                    if (
+                        image.length >
+                        10 *
+                        1024 *
+                        1024
+                    ) {
+
+                        socket.emit(
+                            "message_error",
+                            {
+                                error:
+                                    "Ảnh quá lớn."
+                            }
+                        );
+
+                        return;
+                    }
+
+                    if (
+                        !text &&
+                        !image
+                    ) {
+                        return;
+                    }
+
+                    const sender =
+                        await getUser(from);
+
+                    const message = {
+
                         id:
-                            message.id,
-                        to:
-                            receiver.username,
-                        message
-                    }
-                );
+                            typeof data?.id ===
+                            "string"
+                                ? data.id.slice(
+                                    0,
+                                    100
+                                )
+                                : createID(),
 
-                sendToUser(
-                    receiver.username,
-                    "private_message",
-                    {
-                        ...message,
+                        username:
+                            sender.username,
+
+                        avatar:
+                            sender.avatar,
+
+                        text,
+
+                        image,
+
+                        time:
+                            Number.isFinite(
+                                Number(
+                                    data?.time
+                                )
+                            )
+                                ? Number(
+                                    data.time
+                                )
+                                : now(),
+
+                        reply:
+                            data?.reply &&
+                            typeof data.reply ===
+                            "object"
+                                ? {
+                                    username:
+                                        cleanUsername(
+                                            data.reply.username
+                                        ),
+
+                                    text:
+                                        String(
+                                            data.reply.text ||
+                                            ""
+                                        ).slice(
+                                            0,
+                                            1000
+                                        )
+                                }
+                                : null
+                    };
+
+                    await storeMessage(
                         from,
-                        to:
-                            receiver.username,
-                        mine: false
-                    }
-                );
+                        receiver.username,
+                        message
+                    );
+
+                    socket.emit(
+                        "message_saved",
+                        {
+                            id:
+                                message.id,
+
+                            to:
+                                receiver.username,
+
+                            message
+                        }
+                    );
+
+                    sendToUser(
+                        receiver.username,
+                        "private_message",
+                        {
+                            ...message,
+
+                            from,
+
+                            to:
+                                receiver.username,
+
+                            mine: false
+                        }
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "[PRIVATE MESSAGE]",
+                        error
+                    );
+
+                    socket.emit(
+                        "message_error",
+                        {
+                            error:
+                                "Không thể gửi tin nhắn."
+                        }
+                    );
+                }
             }
         );
 
@@ -1389,7 +2036,9 @@ io.on(
                     {
                         username:
                             socketUsername,
+
                         to,
+
                         stopped:
                             data?.stopped === true
                     }
@@ -1403,201 +2052,287 @@ io.on(
 
         socket.on(
             "friend_request",
-            data => {
+            async data => {
 
-                if (!socketUsername) {
+                try {
+
+                    if (!socketUsername) {
+
+                        socket.emit(
+                            "friend_request_error",
+                            {
+                                error:
+                                    "Bạn chưa đăng nhập."
+                            }
+                        );
+
+                        return;
+                    }
+
+                    const from =
+                        socketUsername;
+
+                    const to =
+                        cleanUsername(
+                            data?.to ||
+                            data?.username
+                        );
+
+                    if (!to) {
+                        return;
+                    }
+
+                    if (
+                        normalizeUsername(
+                            from
+                        ) ===
+                        normalizeUsername(
+                            to
+                        )
+                    ) {
+
+                        socket.emit(
+                            "friend_request_error",
+                            {
+                                error:
+                                    "Không thể kết bạn với chính mình."
+                            }
+                        );
+
+                        return;
+                    }
+
+                    const receiver =
+                        await getUser(to);
+
+                    if (!receiver) {
+
+                        socket.emit(
+                            "friend_request_error",
+                            {
+                                error:
+                                    "Không tìm thấy tài khoản."
+                            }
+                        );
+
+                        return;
+                    }
+
+                    if (
+                        await hasFriend(
+                            from,
+                            to
+                        )
+                    ) {
+
+                        socket.emit(
+                            "friend_request_error",
+                            {
+                                error:
+                                    "Hai người đã là bạn."
+                            }
+                        );
+
+                        return;
+                    }
+
+                    if (
+                        await hasPendingRequest(
+                            from,
+                            to
+                        )
+                    ) {
+
+                        socket.emit(
+                            "friend_request_error",
+                            {
+                                error:
+                                    "Bạn đã gửi lời mời trước đó."
+                            }
+                        );
+
+                        return;
+                    }
+
+                    const reverse =
+                        await pool.query(
+                            `
+                            SELECT *
+                            FROM friend_requests
+                            WHERE
+                                from_key = $1
+                                AND to_key = $2
+                                AND status = 'pending'
+                            LIMIT 1
+                            `,
+                            [
+                                normalizeUsername(
+                                    to
+                                ),
+
+                                normalizeUsername(
+                                    from
+                                )
+                            ]
+                        );
+
+                    if (
+                        reverse.rows.length
+                    ) {
+
+                        const request =
+                            reverse.rows[0];
+
+                        await pool.query(
+                            `
+                            UPDATE friend_requests
+                            SET status = 'accepted'
+                            WHERE id = $1
+                            `,
+                            [request.id]
+                        );
+
+                        await addFriendship(
+                            from,
+                            to
+                        );
+
+                        socket.emit(
+                            "friend_request_accepted",
+                            {
+                                username:
+                                    receiver.username
+                            }
+                        );
+
+                        sendToUser(
+                            receiver.username,
+                            "friend_request_accepted",
+                            {
+                                username:
+                                    from
+                            }
+                        );
+
+                        return;
+                    }
+
+                    const request = {
+
+                        id:
+                            createID(),
+
+                        from:
+                            normalizeUsername(
+                                from
+                            ),
+
+                        to:
+                            normalizeUsername(
+                                to
+                            ),
+
+                        fromUsername:
+                            from,
+
+                        toUsername:
+                            receiver.username,
+
+                        status:
+                            "pending",
+
+                        createdAt:
+                            now()
+                    };
+
+                    await pool.query(
+                        `
+                        INSERT INTO friend_requests (
+                            id,
+                            from_key,
+                            to_key,
+                            from_username,
+                            to_username,
+                            status,
+                            created_at
+                        )
+                        VALUES (
+                            $1,
+                            $2,
+                            $3,
+                            $4,
+                            $5,
+                            $6,
+                            $7
+                        )
+                        `,
+                        [
+                            request.id,
+
+                            request.from,
+
+                            request.to,
+
+                            request.fromUsername,
+
+                            request.toUsername,
+
+                            request.status,
+
+                            request.createdAt
+                        ]
+                    );
+
                     socket.emit(
-                        "friend_request_error",
+                        "friend_request_sent",
                         {
-                            error:
-                                "Bạn chưa đăng nhập."
-                        }
-                    );
+                            id:
+                                request.id,
 
-                    return;
-                }
-
-                const from =
-                    socketUsername;
-
-                const to =
-                    cleanUsername(
-                        data?.to ||
-                        data?.username
-                    );
-
-                if (!to) {
-                    return;
-                }
-
-                if (
-                    normalizeUsername(from) ===
-                    normalizeUsername(to)
-                ) {
-                    socket.emit(
-                        "friend_request_error",
-                        {
-                            error:
-                                "Không thể kết bạn với chính mình."
-                        }
-                    );
-
-                    return;
-                }
-
-                const receiver =
-                    getUser(to);
-
-                if (!receiver) {
-                    socket.emit(
-                        "friend_request_error",
-                        {
-                            error:
-                                "Không tìm thấy tài khoản."
-                        }
-                    );
-
-                    return;
-                }
-
-                if (
-                    hasFriend(
-                        from,
-                        to
-                    )
-                ) {
-                    socket.emit(
-                        "friend_request_error",
-                        {
-                            error:
-                                "Hai người đã là bạn."
-                        }
-                    );
-
-                    return;
-                }
-
-                if (
-                    hasPendingRequest(
-                        from,
-                        to
-                    )
-                ) {
-                    socket.emit(
-                        "friend_request_error",
-                        {
-                            error:
-                                "Bạn đã gửi lời mời trước đó."
-                        }
-                    );
-
-                    return;
-                }
-
-                const reverse =
-                    database.friendRequests.find(
-                        r =>
-                            r.status === "pending" &&
-                            r.from ===
-                                normalizeUsername(to) &&
-                            r.to ===
-                                normalizeUsername(from)
-                    );
-
-                if (reverse) {
-
-                    reverse.status =
-                        "accepted";
-
-                    addFriendship(
-                        from,
-                        to
-                    );
-
-                    scheduleSave();
-
-                    socket.emit(
-                        "friend_request_accepted",
-                        {
                             username:
-                                receiver.username
+                                receiver.username,
+
+                            message:
+                                "Đã gửi lời mời kết bạn."
                         }
                     );
 
                     sendToUser(
                         receiver.username,
-                        "friend_request_accepted",
+                        "friend_request",
                         {
+                            id:
+                                request.id,
+
                             username:
-                                from
+                                from,
+
+                            from:
+                                from,
+
+                            to:
+                                receiver.username,
+
+                            createdAt:
+                                request.createdAt
                         }
                     );
 
-                    return;
+                } catch (error) {
+
+                    console.error(
+                        "[FRIEND REQUEST]",
+                        error
+                    );
+
+                    socket.emit(
+                        "friend_request_error",
+                        {
+                            error:
+                                "Không thể gửi lời mời."
+                        }
+                    );
                 }
-
-                const request = {
-                    id: createID(),
-
-                    from:
-                        normalizeUsername(from),
-
-                    to:
-                        normalizeUsername(to),
-
-                    fromUsername:
-                        from,
-
-                    toUsername:
-                        receiver.username,
-
-                    status:
-                        "pending",
-
-                    createdAt:
-                        now()
-                };
-
-                database.friendRequests.push(
-                    request
-                );
-
-                scheduleSave();
-
-                socket.emit(
-                    "friend_request_sent",
-                    {
-                        id:
-                            request.id,
-
-                        username:
-                            receiver.username,
-
-                        message:
-                            "Đã gửi lời mời kết bạn."
-                    }
-                );
-
-                sendToUser(
-                    receiver.username,
-                    "friend_request",
-                    {
-                        id:
-                            request.id,
-
-                        username:
-                            from,
-
-                        from:
-                            from,
-
-                        to:
-                            receiver.username,
-
-                        createdAt:
-                            request.createdAt
-                    }
-                );
             }
         );
 
@@ -1607,58 +2342,81 @@ io.on(
 
         socket.on(
             "accept_friend_request",
-            data => {
+            async data => {
 
-                if (!socketUsername) {
-                    return;
-                }
+                try {
 
-                const request =
-                    database.friendRequests.find(
-                        r =>
-                            r.id === data?.id &&
-                            r.status === "pending"
+                    if (!socketUsername) {
+                        return;
+                    }
+
+                    const result =
+                        await pool.query(
+                            `
+                            SELECT *
+                            FROM friend_requests
+                            WHERE
+                                id = $1
+                                AND status = 'pending'
+                            LIMIT 1
+                            `,
+                            [data?.id]
+                        );
+
+                    if (!result.rows.length) {
+                        return;
+                    }
+
+                    const request =
+                        result.rows[0];
+
+                    if (
+                        request.to_key !==
+                        normalizeUsername(
+                            socketUsername
+                        )
+                    ) {
+                        return;
+                    }
+
+                    await pool.query(
+                        `
+                        UPDATE friend_requests
+                        SET status = 'accepted'
+                        WHERE id = $1
+                        `,
+                        [request.id]
                     );
 
-                if (!request) {
-                    return;
-                }
-
-                if (
-                    request.to !==
-                    normalizeUsername(
+                    await addFriendship(
+                        request.from_username,
                         socketUsername
-                    )
-                ) {
-                    return;
+                    );
+
+                    socket.emit(
+                        "friend_request_accepted",
+                        {
+                            username:
+                                request.from_username
+                        }
+                    );
+
+                    sendToUser(
+                        request.from_username,
+                        "friend_request_accepted",
+                        {
+                            username:
+                                socketUsername
+                        }
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "[ACCEPT FRIEND]",
+                        error
+                    );
                 }
-
-                request.status =
-                    "accepted";
-
-                addFriendship(
-                    request.fromUsername,
-                    socketUsername
-                );
-
-                scheduleSave();
-
-                socket.emit(
-                    "friend_request_accepted",
-                    {
-                        username:
-                            request.fromUsername
-                    }
-                );
-
-                sendToUser(
-                    request.fromUsername,
-                    "friend_request_accepted",
-                    {
-                        username:
-                            socketUsername
-                    }
-                );
             }
         );
 
@@ -1668,44 +2426,67 @@ io.on(
 
         socket.on(
             "reject_friend_request",
-            data => {
+            async data => {
 
-                if (!socketUsername) {
-                    return;
-                }
+                try {
 
-                const request =
-                    database.friendRequests.find(
-                        r =>
-                            r.id === data?.id &&
-                            r.status === "pending"
+                    if (!socketUsername) {
+                        return;
+                    }
+
+                    const result =
+                        await pool.query(
+                            `
+                            SELECT *
+                            FROM friend_requests
+                            WHERE
+                                id = $1
+                                AND status = 'pending'
+                            LIMIT 1
+                            `,
+                            [data?.id]
+                        );
+
+                    if (!result.rows.length) {
+                        return;
+                    }
+
+                    const request =
+                        result.rows[0];
+
+                    if (
+                        request.to_key !==
+                        normalizeUsername(
+                            socketUsername
+                        )
+                    ) {
+                        return;
+                    }
+
+                    await pool.query(
+                        `
+                        UPDATE friend_requests
+                        SET status = 'rejected'
+                        WHERE id = $1
+                        `,
+                        [request.id]
                     );
 
-                if (!request) {
-                    return;
+                    socket.emit(
+                        "friend_request_rejected",
+                        {
+                            username:
+                                request.from_username
+                        }
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "[REJECT FRIEND]",
+                        error
+                    );
                 }
-
-                if (
-                    request.to !==
-                    normalizeUsername(
-                        socketUsername
-                    )
-                ) {
-                    return;
-                }
-
-                request.status =
-                    "rejected";
-
-                scheduleSave();
-
-                socket.emit(
-                    "friend_request_rejected",
-                    {
-                        username:
-                            request.fromUsername
-                    }
-                );
             }
         );
 
@@ -1715,59 +2496,75 @@ io.on(
 
         socket.on(
             "update_avatar",
-            data => {
+            async data => {
 
-                if (!socketUsername) {
-                    return;
-                }
+                try {
 
-                const avatar =
-                    typeof data?.avatar === "string"
-                        ? data.avatar
-                        : "";
+                    if (!socketUsername) {
+                        return;
+                    }
 
-                if (!avatar) {
-                    return;
-                }
+                    const avatar =
+                        typeof data?.avatar ===
+                        "string"
+                            ? data.avatar
+                            : "";
 
-                if (
-                    avatar.length >
-                    7 * 1024 * 1024
-                ) {
-                    return;
-                }
+                    if (!avatar) {
+                        return;
+                    }
 
-                const user =
-                    getUser(
-                        socketUsername
+                    if (
+                        avatar.length >
+                        7 *
+                        1024 *
+                        1024
+                    ) {
+                        return;
+                    }
+
+                    await pool.query(
+                        `
+                        UPDATE users
+                        SET avatar = $1
+                        WHERE username_key = $2
+                        `,
+                        [
+                            avatar,
+
+                            normalizeUsername(
+                                socketUsername
+                            )
+                        ]
                     );
 
-                if (!user) {
-                    return;
+                    io.emit(
+                        "user_avatar",
+                        {
+                            username:
+                                socketUsername,
+
+                            avatar
+                        }
+                    );
+
+                    socket.emit(
+                        "avatar_updated",
+                        {
+                            username:
+                                socketUsername,
+
+                            avatar
+                        }
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "[AVATAR]",
+                        error
+                    );
                 }
-
-                user.avatar =
-                    avatar;
-
-                scheduleSave();
-
-                io.emit(
-                    "user_avatar",
-                    {
-                        username:
-                            user.username,
-                        avatar
-                    }
-                );
-
-                socket.emit(
-                    "avatar_updated",
-                    {
-                        username:
-                            user.username,
-                        avatar
-                    }
-                );
             }
         );
 
@@ -1817,6 +2614,7 @@ io.on(
                 );
 
                 if (socketUsername) {
+
                     removeOnlineUser(
                         socketUsername,
                         socket.id
@@ -1841,13 +2639,7 @@ app.get(
                 "index.html"
             );
 
-        if (fs.existsSync(index)) {
-            return res.sendFile(index);
-        }
-
-        res.status(404).send(
-            "Không tìm thấy public/index.html"
-        );
+        return res.sendFile(index);
     }
 );
 
@@ -1859,7 +2651,7 @@ app.use(
     "/api",
     (req, res) => {
 
-        res.status(404).json({
+        return res.status(404).json({
             ok: false,
             success: false,
             message:
@@ -1884,7 +2676,7 @@ app.use(
             return next(err);
         }
 
-        res.status(500).json({
+        return res.status(500).json({
             ok: false,
             success: false,
             message:
@@ -1897,89 +2689,134 @@ app.use(
    START
 ========================================================= */
 
-server.listen(
-    PORT,
-    "0.0.0.0",
-    () => {
+async function startServer() {
 
-        console.log("");
-        console.log(
+    try {
+
+        await initDatabase();
+
+        server.listen(
+            PORT,
+            "0.0.0.0",
+            () => {
+
+                console.log("");
+                console.log(
+                    "======================================"
+                );
+
+                console.log(
+                    "       M4 CHAT SERVER ONLINE"
+                );
+
+                console.log(
+                    "======================================"
+                );
+
+                console.log(
+                    `PORT: ${PORT}`
+                );
+
+                console.log(
+                    "DATABASE: PostgreSQL"
+                );
+
+                console.log(
+                    "REGISTER: ENABLED"
+                );
+
+                console.log(
+                    "LOGIN: ENABLED"
+                );
+
+                console.log(
+                    "JWT COOKIE: ENABLED"
+                );
+
+                console.log(
+                    "SOCKET.IO: ENABLED"
+                );
+
+                console.log(
+                    "PRIVATE CHAT: ENABLED"
+                );
+
+                console.log(
+                    "FRIENDS: ENABLED"
+                );
+
+                console.log(
+                    "AVATAR: ENABLED"
+                );
+
+                console.log(
+                    "======================================"
+                );
+
+                console.log("");
+            }
+        );
+
+    } catch (error) {
+
+        console.error("");
+        console.error(
             "======================================"
         );
-        console.log(
-            "       M4 CHAT SERVER ONLINE"
+        console.error(
+            "M4 CHAT SERVER FAILED TO START"
         );
-        console.log(
+        console.error(
             "======================================"
         );
-        console.log(
-            `PORT: ${PORT}`
-        );
-        console.log(
-            `DATA: ${DATA_FILE}`
-        );
-        console.log(
-            `PUBLIC: ${PUBLIC_DIR}`
-        );
-        console.log(
-            "AUTH: JWT COOKIE ENABLED"
-        );
-        console.log(
-            "REGISTER: ENABLED"
-        );
-        console.log(
-            "LOGIN: ENABLED"
-        );
-        console.log(
-            "API ME: ENABLED"
-        );
-        console.log(
-            "SOCKET.IO: ENABLED"
-        );
-        console.log(
-            "FRIENDS: ENABLED"
-        );
-        console.log(
-            "======================================"
-        );
-        console.log("");
+        console.error(error);
+        console.error("");
+
+        process.exit(1);
     }
-);
+}
 
 /* =========================================================
    SHUTDOWN
 ========================================================= */
 
-function shutdown(signal) {
+async function shutdown(
+    signal
+) {
 
     console.log(
         `[SERVER] ${signal} received.`
     );
 
     try {
-        clearTimeout(saveTimer);
-        saveDatabase();
+
+        await pool.end();
+
+        server.close(
+            () => {
+
+                console.log(
+                    "[SERVER] Closed."
+                );
+
+                process.exit(0);
+            }
+        );
+
+        setTimeout(
+            () => process.exit(0),
+            5000
+        );
+
     } catch (error) {
+
         console.error(
-            "[SERVER] Save error:",
+            "[SERVER] Shutdown error:",
             error
         );
+
+        process.exit(1);
     }
-
-    server.close(
-        () => {
-            console.log(
-                "[SERVER] Closed."
-            );
-
-            process.exit(0);
-        }
-    );
-
-    setTimeout(
-        () => process.exit(0),
-        5000
-    );
 }
 
 process.on(
@@ -1991,3 +2828,9 @@ process.on(
     "SIGINT",
     () => shutdown("SIGINT")
 );
+
+/* =========================================================
+   START
+========================================================= */
+
+startServer();
